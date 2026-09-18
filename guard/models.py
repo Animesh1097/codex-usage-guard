@@ -17,14 +17,20 @@ class GuardPlan:
     context_budget_tokens: int
     max_model_turns: int
     max_retries: int
+    max_actions: int
     max_parallel_agents: int
+    requires_tests: bool
+    requires_build: bool
+    requires_lint: bool
+    context_mode: str = "hot-warm-cold"
     predicted_steps: tuple[str, ...] = field(default_factory=tuple)
+    repo_signals: tuple[str, ...] = field(default_factory=tuple)
     reasons: tuple[str, ...] = field(default_factory=tuple)
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
-        data["predicted_steps"] = list(self.predicted_steps)
-        data["reasons"] = list(self.reasons)
+        for key in ("predicted_steps", "repo_signals", "reasons"):
+            data[key] = list(data[key])
         return data
 
 
@@ -34,6 +40,7 @@ class NextAction:
     reason: str
     stop: bool = False
     deterministic: bool = True
+    cost_class: str = "free-local"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

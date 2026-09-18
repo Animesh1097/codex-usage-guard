@@ -16,14 +16,30 @@ class CompressorTests(unittest.TestCase):
         self.assertLess(len(compact), len(noisy))
         self.assertLess(estimate_tokens(compact), estimate_tokens(noisy))
 
-    def test_git_diff_keeps_changed_lines(self):
-        body = ["diff --git a/a.py b/a.py", "--- a/a.py", "+++ b/a.py", "@@ -1,3 +1,3 @@"]
-        body += [" unchanged line"] * 200
+    def test_git_diff_keeps_changed_lines_and_small_context(self):
+        body = [
+            "diff --git a/a.py b/a.py",
+            "index 1111111..2222222 100644",
+            "--- a/a.py",
+            "+++ b/a.py",
+            "@@ -1,205 +1,205 @@",
+        ]
+        body += [f" context_{i}" for i in range(100)]
         body += ["-old_value", "+new_value"]
-        compact = compress_git_diff("\n".join(body))
+        body += [f" trailing_{i}" for i in range(100)]
+        compact = compress_git_diff("\n".join(body), context_radius=2)
         self.assertIn("-old_value", compact)
         self.assertIn("+new_value", compact)
-        self.assertNotIn(" unchanged line", compact)
+        self.assertIn(" context_99", compact)
+        self.assertIn(" trailing_0", compact)
+        self.assertNotIn(" context_0", compact)
+        self.assertLess(len(compact.splitlines()), 30)
+
+    def test_ansi_noise_is_removed(self):
+        noisy = "\x1b[31mERROR\x1b[0m something failed\n" + "\n".join(["noise"] * 100)
+        compact = compress_test_output(noisy)
+        self.assertIn("ERROR", compact)
+        self.assertNotIn("\x1b", compact)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 name = "guard_reviewer"
-description = "Usage-conscious independent reviewer for correctness and regression risk."
-model = "gpt-5.6-luna"
-model_reasoning_effort = "medium"
+description = "Independent reviewer for correctness, security, regression risk, and missing verification."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """
-Review only the final diff and directly relevant behavior. Prioritize correctness, regressions, security, and missing verification. Ignore style-only issues. Return concise actionable findings and do not spawn subagents.
+Review only the final diff and directly relevant behavior. Prioritize correctness, security, regressions, and missing test coverage. Ignore style-only issues. Return concise actionable findings and do not spawn subagents.
 """

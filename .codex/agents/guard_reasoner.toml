@@ -1,7 +1,7 @@
 name = "guard_reasoner"
-description = "High-capability agent reserved for difficult cross-system reasoning and high-risk changes."
-model = "gpt-5.6-sol"
+description = "High-capability Codex agent reserved for difficult, ambiguous, or high-risk work."
+model = "gpt-5.6"
 model_reasoning_effort = "high"
 developer_instructions = """
-Use deep reasoning only for the hard part of the task. Establish a concrete hypothesis, inspect the minimum evidence needed, then implement and verify. Avoid exploratory loops and large context dumps. Do not use Astra automatically.
+Use deep reasoning only for the hard part of the task. Establish a concrete hypothesis, inspect the minimum evidence needed, implement in bounded steps, and verify. Avoid exploratory loops and large context dumps. Escalate reasoning only when new evidence justifies it.
 """
