@@ -83,18 +83,19 @@ def _tracked_count(root: Path) -> int:
 
 
 def _changed_lines(root: Path) -> int:
+    # "git diff HEAD" already includes both staged and unstaged tracked changes.
+    # Do not add --cached separately or staged lines are double-counted.
     total = 0
-    for args in (("git", "diff", "--numstat", "HEAD"), ("git", "diff", "--cached", "--numstat")):
-        proc = _run(root, *args)
-        if not proc or proc.returncode != 0:
+    proc = _run(root, "git", "diff", "--numstat", "HEAD")
+    if not proc or proc.returncode != 0:
+        return 0
+    for line in proc.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) < 3:
             continue
-        for line in proc.stdout.splitlines():
-            parts = line.split("\t")
-            if len(parts) < 3:
-                continue
-            for value in parts[:2]:
-                if value.isdigit():
-                    total += int(value)
+        for value in parts[:2]:
+            if value.isdigit():
+                total += int(value)
     return total
 
 
@@ -125,6 +126,8 @@ def _script_command(pm: str | None, script: str, scripts: dict[str, Any]) -> str
         return None
     if pm == "npm":
         return f"npm run {script}" if script != "test" else "npm test"
+    if pm == "bun":
+        return f"bun run {script}"
     return f"{pm} {script}"
 
 
@@ -147,13 +150,15 @@ def _project_types(root: Path) -> list[str]:
 
 
 def _python_commands(root: Path) -> tuple[str | None, str | None, str | None]:
-    text = ""
-    pyproject = root / "pyproject.toml"
-    if pyproject.exists():
-        try:
-            text = pyproject.read_text(encoding="utf-8", errors="replace").lower()
-        except OSError:
-            pass
+    chunks: list[str] = []
+    for name in ("pyproject.toml", "requirements.txt", "requirements-dev.txt", "setup.cfg", "tox.ini"):
+        source = root / name
+        if source.exists():
+            try:
+                chunks.append(source.read_text(encoding="utf-8", errors="replace").lower())
+            except OSError:
+                pass
+    text = "\n".join(chunks)
     test = "python -m pytest" if ("pytest" in text or (root / "pytest.ini").exists()) else None
     lint = "python -m ruff check ." if "ruff" in text else None
     typecheck = "python -m mypy ." if "mypy" in text else None
