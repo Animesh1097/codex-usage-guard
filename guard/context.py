@@ -5,7 +5,7 @@ from typing import Any
 
 from .budget import budget_status
 from .repo import inspect_repo, changed_file_hashes
-from .state import load_task, save_task
+from .state import TASKS_ROOT, load_task, save_task
 
 
 def refresh_file_hashes(state: dict[str, Any]) -> dict[str, Any]:
@@ -24,10 +24,10 @@ def refresh_file_hashes(state: dict[str, Any]) -> dict[str, Any]:
     return state
 
 
-def make_capsule(task_id: str) -> dict[str, Any]:
-    state = load_task(task_id)
+def make_capsule(task_id: str, *, root: Path = TASKS_ROOT) -> dict[str, Any]:
+    state = load_task(task_id, root=root)
     state = refresh_file_hashes(state)
-    save_task(state)
+    save_task(state, root=root)
 
     plan = state.get("plan", {})
     repo = state.get("repo", {})
@@ -39,6 +39,7 @@ def make_capsule(task_id: str) -> dict[str, Any]:
         "hot": {
             "unresolved": state.get("unresolved", []),
             "changed_since_snapshot": state.get("changed_since_snapshot", []),
+            "removed_since_snapshot": state.get("removed_since_snapshot", []),
             "changed_files": repo.get("changed_files", []),
             "sensitive_files": repo.get("sensitive_files", []),
         },
@@ -57,7 +58,7 @@ def make_capsule(task_id: str) -> dict[str, Any]:
             },
         },
         "cold": {
-            "state_file": str((Path.home() / ".codex-usage-guard-data" / "tasks" / f"{task_id}.json")),
+            "state_file": str(root / f"{task_id}.json"),
             "full_event_count": len(state.get("events", [])),
             "tracked_file_hashes": len(state.get("file_hashes", {})),
         },
