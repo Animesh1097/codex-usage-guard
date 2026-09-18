@@ -20,24 +20,16 @@ It does **not** replace Codex and it does **not** run another LLM. It adds deter
 
 ## No extra model stack
 
-Codex Usage Guard requires:
+Requirements:
 
-- an existing Codex installation
-- an existing ChatGPT/Codex sign-in
+- existing Codex installation
+- existing ChatGPT/Codex sign-in
 - Git
 - Python 3.10+
 
-It does **not** require:
-
-- `OPENAI_API_KEY`
-- Ollama
-- DeepSeek or Anthropic API keys
-- a paid proxy
-- a vector database
+No `OPENAI_API_KEY`, Ollama, DeepSeek/Anthropic key, paid proxy, or vector database is required.
 
 ## Model policy
-
-V0.1 ships conservative Codex subagent profiles:
 
 | Workload | Profile | Model | Reasoning |
 |---|---|---|---|
@@ -46,31 +38,31 @@ V0.1 ships conservative Codex subagent profiles:
 | difficult/high-risk | `guard_reasoner` | `gpt-5.6-sol` | high |
 | review only when needed | `guard_reviewer` | `gpt-5.6-luna` | medium |
 
-Astra is deliberately **not selected automatically in v0.1**. The goal is allowance conservation. If a configured model is unavailable, the Skill instructs Codex to keep the same usage policy and continue with the current model.
+Astra is deliberately **not selected automatically in v0.1**. If a configured model is unavailable, the Skill falls back to the current Codex agent while preserving the same usage policy.
 
 ## Install on Windows
 
-Open PowerShell and run:
+Open PowerShell:
 
     irm https://raw.githubusercontent.com/Animesh1097/codex-usage-guard/main/install.ps1 | iex
 
-The installer clones this project to `~/.codex-usage-guard`, installs the global Skill, installs usage-conscious agent profiles, and adds the optional custom-prompt wrapper.
+The installer clones this project to `~/.codex-usage-guard`, installs the global Skill and agent profiles, installs the optional custom-prompt wrapper, and creates a stable local `guard.cmd` launcher.
 
 Restart Codex after installation.
 
 ## Use
 
-The reliable interface is the Codex Skill:
+Reliable Skill invocation:
 
     $usage-guard fix the seller form and verify the build
 
-Codex can also automatically select the Skill when a task matches its description.
+Codex can also automatically select the Skill when the task matches its description.
 
-For Codex CLI versions/frontends where user custom prompts are available:
+Where user custom prompts are supported:
 
     /prompts:harness fix the seller form and verify the build
 
-Custom prompt support has changed across Codex releases/frontends, so `$usage-guard` is the stable fallback. This project does not claim that arbitrary first-class `/harness` commands are universally supported today.
+Custom prompt support has changed across Codex releases/frontends, so `$usage-guard` is the stable fallback. The project does not claim arbitrary first-class `/harness` commands are universally supported today.
 
 ## Architecture
 
@@ -84,6 +76,7 @@ Custom prompt support has changed across Codex releases/frontends, so `$usage-gu
          v
        Codex
          |
+         +-> one selected worker profile
          +-> narrow search and targeted reads
          +-> deterministic tests/build/lint first
          +-> local output compression
@@ -95,31 +88,31 @@ Custom prompt support has changed across Codex releases/frontends, so `$usage-gu
          v
     verified completion
 
-## Local guard commands
+## Local guard commands on Windows
 
 Classify a task:
 
-    python .\scripts\guard_cli.py plan --task "fix the login bug" --repo .
+    & "$HOME\.codex-usage-guard\guard.cmd" plan --task "fix the login bug" --repo .
 
 Compress noisy test output:
 
-    npm test 2>&1 | python "$HOME\.codex-usage-guard\scripts\guard_cli.py" compress --type test
+    npm test 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type test
 
 Compress a large diff:
 
-    git diff 2>&1 | python "$HOME\.codex-usage-guard\scripts\guard_cli.py" compress --type git
+    git diff 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type git
 
 Predict the next action:
 
-    python "$HOME\.codex-usage-guard\scripts\guard_cli.py" next --kind debugging --changed-files 2 --test-status pass
+    & "$HOME\.codex-usage-guard\guard.cmd" next --kind debugging --changed-files 2 --test-status pass
 
 Show local compression telemetry:
 
-    python "$HOME\.codex-usage-guard\scripts\guard_cli.py" stats
+    & "$HOME\.codex-usage-guard\guard.cmd" stats
 
 ## Usage-first rules
 
-1. **No multi-agent by default.** Extra agents must justify their additional usage.
+1. **No multi-agent by default.** Extra agents must justify additional usage.
 2. **Deterministic evidence before reasoning.** Tests, Git, lint, build output, and exact searches come first.
 3. **Re-plan after evidence.** Do not blindly follow a stale long plan.
 4. **Bound retries.** A retry needs a changed hypothesis or new evidence.
@@ -128,17 +121,15 @@ Show local compression telemetry:
 
 ## Development
 
-Run the test suite:
+Run tests:
 
     python -m unittest discover -s tests -v
 
-V0.1 has no runtime Python dependencies.
-
-GitHub Actions runs the tests on Windows and Ubuntu with Python 3.11 and 3.13.
+V0.1 has no runtime Python dependencies. GitHub Actions runs the test suite on Windows and Ubuntu with Python 3.11 and 3.13, and parses the PowerShell installer scripts on Windows.
 
 ## Important limitation
 
-Codex plan/credit usage is not determined only by token count. Model choice, reasoning, tool use, task complexity, and execution can all affect usage. Telemetry from this project reports **estimated context reduction**, not a guaranteed percentage increase in Codex allowance.
+Codex plan/credit usage is not determined only by token count. Model choice, reasoning, tool use, task complexity, and execution can all affect usage. Telemetry reports **estimated context reduction**, not a guaranteed percentage increase in Codex allowance.
 
 ## Independence notice
 
