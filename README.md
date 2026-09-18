@@ -11,7 +11,7 @@ It does not replace Codex and it does not run another LLM. It adds deterministic
 - classifies the task before broad repository exploration
 - inspects the real repository, changed files, diff size, manifests, scripts, and sensitive paths
 - selects a bounded Codex agent profile and reasoning level
-- keeps hard action, model-turn, and retry budgets
+- keeps state-enforced action, model-turn, and retry budgets
 - stores persistent task state under `~/.codex-usage-guard-data`
 - tracks SHA-256 hashes for changed files to detect re-reads and new changes
 - builds compact **Hot / Warm / Cold** state capsules instead of relying on the full task history
