@@ -1,3 +1,1 @@
-"""Codex Usage Guard core package."""
-
-__version__ = "0.1.0"
+"""Codex Usage Guard core package."""\n\n__version__ = "0.2.0"\n
