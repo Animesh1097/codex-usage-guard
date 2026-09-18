@@ -6,6 +6,7 @@ $SkillTarget = Join-Path $HOME ".agents\skills\usage-guard"
 $CodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
 $AgentTarget = Join-Path $CodexHome "agents"
 $PromptTarget = Join-Path $CodexHome "prompts"
+$Launcher = Join-Path $InstallRoot "guard.cmd"
 
 function Require-Command([string]$Name) {
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
@@ -38,12 +39,16 @@ Copy-Item -Recurse -Force (Join-Path $InstallRoot ".agents\skills\usage-guard") 
 Copy-Item -Force (Join-Path $InstallRoot ".codex\agents\guard_*.toml") $AgentTarget
 Copy-Item -Force (Join-Path $InstallRoot "prompts\harness.md") (Join-Path $PromptTarget "harness.md")
 
-Write-Host "Running local doctor..." -ForegroundColor Cyan
 if ($Python -eq "py") {
-    & py -3 (Join-Path $InstallRoot "scripts\guard_cli.py") doctor
+    $LauncherBody = "@echo off`r`npy -3 `"%~dp0scripts\guard_cli.py`" %*`r`n"
 } else {
-    & python (Join-Path $InstallRoot "scripts\guard_cli.py") doctor
+    $LauncherBody = "@echo off`r`npython `"%~dp0scripts\guard_cli.py`" %*`r`n"
 }
+Set-Content -Path $Launcher -Value $LauncherBody -Encoding Ascii -NoNewline
+
+Write-Host "Running local doctor..." -ForegroundColor Cyan
+& $Launcher doctor
+if ($LASTEXITCODE -ne 0) { throw "Usage Guard doctor failed." }
 
 Write-Host ""
 Write-Host "Codex Usage Guard installed." -ForegroundColor Green
