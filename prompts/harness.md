@@ -3,7 +3,7 @@ description: Run Codex Usage Guard for a task
 argument-hint: "[task]"
 ---
 
-$usage-guard
+$$usage-guard
 
 Complete this objective under the Usage Guard policy:
 
