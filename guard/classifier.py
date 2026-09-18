@@ -13,6 +13,7 @@ COMPLEXITY_WEIGHTS: dict[str, int] = {
     "root cause": 2,
     "investigate": 2,
     "debug": 1,
+    "bug": 1,
     "refactor": 2,
     "architecture": 3,
     "migration": 3,
@@ -128,7 +129,7 @@ def classify_task(task: str, repo_path: str | Path = ".") -> GuardPlan:
     if len(task) > 240:
         complexity += 1
         reasons.append("long task description")
-    if sum(text.count(joiner) for joiner in (" and ", " then ", " also ")) >= 2:
+    if sum(text.count(joiner) for joiner in (" and ", " then ", " also ")) >= 1:
         complexity += 1
         reasons.append("multiple requested actions")
 
