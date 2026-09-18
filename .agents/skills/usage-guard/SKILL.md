@@ -1,86 +1,54 @@
 ---
 name: usage-guard
-description: Conserve Codex allowance while completing coding tasks. Use for implementation, debugging, refactoring, deployment checks, repository investigation, or any task where context size, repeated tool output, retries, model choice, reasoning effort, and unnecessary agent loops should be minimized.
+description: Conserve Codex allowance while completing coding tasks. Use for implementation, debugging, refactoring, deployment checks, or repository investigation when context, retries, reasoning effort, model choice, and unnecessary agent loops should be minimized.
 ---
 
 # Codex Usage Guard
 
-Treat the user's objective as the source of truth. Do not ask the user to choose a model, reasoning level, agent mode, or next step when the harness can decide.
+Treat the user's objective as the source of truth. Do not ask the user to choose a model, reasoning level, agent mode, or next step when the guard can decide.
 
-## 1. Classify before spending
+## Start every guarded task
 
-Run the bundled deterministic planner before broad repository exploration.
+On Windows:
 
-Windows PowerShell:
+    & "$HOME\.codex-usage-guard\guard.cmd" start --task "<USER_OBJECTIVE>" --repo .
 
-    & "$HOME\.codex-usage-guard\guard.cmd" plan --task "<USER_OBJECTIVE>" --repo .
+Keep the returned `task_id`. The response contains the repo-aware plan, model profile, reasoning effort, hard action/model/retry budgets, and deterministic verification commands.
 
-POSIX:
+Route the implementation to the selected custom agent profile when available. Give it only the objective, budget, compact state capsule, and minimum relevant repository evidence. If the selected profile/model is unavailable, keep the current Codex model but preserve the guard policy.
 
-    python3 "$HOME/.codex-usage-guard/scripts/guard_cli.py" plan --task "<USER_OBJECTIVE>" --repo .
+## Work loop
 
-Use agent_profile, reasoning_effort, context_budget_tokens, max_model_turns, max_retries, and predicted_steps as hard guidance. Never fan out agents merely because parallelism is available.
+Before another model-heavy action:
 
-## 2. Route the work automatically
+    & "$HOME\.codex-usage-guard\guard.cmd" capsule --task-id <ID>
 
-After classification, route the implementation to exactly one named agent profile from the plan when that profile is available. Give that agent only the objective, the budget, and the minimum relevant repository evidence. Keep the parent thread as a thin coordinator instead of duplicating exploration.
+After a meaningful action, record it:
 
-- guard_fast: tiny/simple work, low reasoning.
-- guard_worker: normal implementation/debugging.
-- guard_reasoner: hard cross-system reasoning only.
-- guard_reviewer: independent review only when deterministic checks cannot establish correctness.
+    & "$HOME\.codex-usage-guard\guard.cmd" record --task-id <ID> --action "<ACTION>" --kind <deterministic|model> --outcome <info|pass|fail>
 
-If a requested profile or model is unavailable, continue with the current Codex agent while preserving the same budget and reasoning policy. Do not fail the task merely because a cheaper profile is unavailable.
+Ask the local predictor for the cheapest useful next step:
 
-## 3. Spend deterministic work before model work
+    & "$HOME\.codex-usage-guard\guard.cmd" next --task-id <ID> [verification status flags]
 
-Prefer, in order:
+If `record` rejects an action because a budget is exhausted, do not bypass it automatically. Reassess the hypothesis and only escalate when new evidence justifies another Codex turn.
 
-1. git status, targeted git diff, exact symbol/file search.
-2. Existing deterministic tests, lint, type checks, and builds.
-3. Small targeted file reads.
-4. A model reasoning turn only when semantic judgment is actually required.
+Compress noisy command output locally before it re-enters context:
 
-Do not reread unchanged files. Do not rescan the full repository after relevant files are known. Keep exact paths, code, error messages, stack frames, IDs, hashes, SQL, API routes, environment-variable names, and current user requirements lossless.
+    npm test 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type test --task-id <ID>
+    git diff 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type git --task-id <ID>
 
-## 4. Compress noisy tool output locally
+## Finish
 
-When a command may produce large output, compress before feeding it back into the reasoning loop.
+Verify requirements and final diff, then:
 
-Windows examples:
+    & "$HOME\.codex-usage-guard\guard.cmd" finish --task-id <ID> --status completed
 
-    npm test 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type test
-    git diff 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type git
+Keep the user-facing report short: what changed, what was verified, and unresolved risks.
 
-Use --type log for build/server logs. Never compress away the exact failing diagnostic needed for a fix.
+Read the reference files only when needed:
+- `references/routing.md` for escalation and subagent rules.
+- `references/verification.md` for choosing checks.
+- `references/context.md` for Hot/Warm/Cold context handling.
 
-## 5. Predict the next action instead of asking the user
-
-After each meaningful state change, choose the cheapest useful next action. Use the local predictor when the decision is routine:
-
-    & "$HOME\.codex-usage-guard\guard.cmd" next --kind <KIND> --changed-files <N> --test-status <not-run|pass|fail> --build-status <not-run|pass|fail|not-needed> --lint-status <not-run|pass|fail|not-needed>
-
-Recompute after new evidence. Do not blindly follow a stale long plan.
-
-## 6. Bounded agent and retry policy
-
-A subagent must receive only task-specific context, never the entire parent transcript. Spawn at most one concurrent subagent unless the user explicitly requests parallel work.
-
-A failed attempt must produce new evidence. Never repeat the same search/edit/test cycle without a changed hypothesis.
-
-When the retry budget is exhausted:
-
-1. Stop the loop.
-2. Collect the exact failure evidence.
-3. Reassess the hypothesis and scope.
-4. Escalate model/reasoning once only if the task still requires it.
-
-## 7. Definition of done
-
-Before stopping, verify every explicit requirement, inspect the final diff, and run the smallest sufficient deterministic checks. For production/deployment tasks, verify the production state when access exists.
-
-Stop when another model turn is unlikely to materially improve completion. Do not use remaining budget just because it exists.
-
-## Reporting
-
-Keep the user-facing report short: what changed, what was verified, unresolved risks if any, and the usage-guard strategy only when useful. Never claim that estimated context reduction equals the same percentage of Codex allowance saved.
+Never claim estimated context reduction equals the same percentage of Codex allowance saved.
