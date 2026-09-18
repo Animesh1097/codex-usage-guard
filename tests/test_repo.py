@@ -52,6 +52,34 @@ class RepoTests(unittest.TestCase):
             self.assertTrue(profile.docs_only)
             self.assertIn("docs_only_change", profile.signals)
 
+    def test_staged_diff_is_not_double_counted(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            init_repo(root)
+            file = root / "a.txt"
+            file.write_text("one\n", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True)
+            file.write_text("two\n", encoding="utf-8")
+            subprocess.run(["git", "add", "a.txt"], cwd=root, check=True)
+            profile = inspect_repo(root)
+            self.assertEqual(profile.changed_lines, 2)
+
+    def test_bun_uses_run_for_package_scripts(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            init_repo(root)
+            (root / "package.json").write_text(
+                json.dumps({"scripts": {"test": "vitest run", "build": "vite build"}}),
+                encoding="utf-8",
+            )
+            (root / "bun.lock").write_text("", encoding="utf-8")
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True)
+            profile = inspect_repo(root)
+            self.assertEqual(profile.test_command, "bun run test")
+            self.assertEqual(profile.build_command, "bun run build")
+
 
 if __name__ == "__main__":
     unittest.main()
