@@ -1,44 +1,52 @@
 # Codex Usage Guard
 
-**Codex Usage Guard** is an open-source, zero-API-key usage optimizer for OpenAI Codex. It is built for a specific problem: Codex allowance draining too quickly during long coding sessions.
+**Codex Usage Guard** is a local, zero-API-key control plane for OpenAI Codex. It is designed for one problem: **Codex allowance draining too quickly on long or repetitive coding sessions**.
 
-It does **not** replace Codex and it does **not** run another LLM. It adds deterministic local policy around Codex so expensive reasoning, context, retries, and subagents are used only when justified.
+It does not replace Codex and it does not run another LLM. It adds deterministic local policy around Codex so model strength, reasoning effort, context, retries, verification, and subagents are used only when justified.
 
-> Status: **v0.1 developer preview**. Usage reduction must not silently destroy code-critical context.
+> **v0.2 developer preview**. The project reports estimated context reduction, not guaranteed Codex allowance savings.
 
-## Core behavior
+## What v0.2 does
 
-- Classify the task locally before broad repository exploration.
-- Choose a usage tier and bounded reasoning policy.
-- Keep a context budget per task.
-- Default to one agent instead of automatic multi-agent fan-out.
-- Compress noisy tests, diffs, and logs locally with no model call.
-- Predict the cheapest useful next action after every meaningful state change.
-- Cap retries and stop repeated search/edit/test loops that have no new evidence.
-- Prefer tests, builds, lint, Git, and exact search before another reasoning turn.
-- Keep exact code, paths, errors, stack frames, IDs, hashes, SQL, routes, environment variable names, and current requirements lossless.
+- classifies the task before broad repository exploration
+- inspects the real repository, changed files, diff size, manifests, scripts, and sensitive paths
+- selects a bounded Codex agent profile and reasoning level
+- keeps hard action, model-turn, and retry budgets
+- stores persistent task state under `~/.codex-usage-guard-data`
+- tracks SHA-256 hashes for changed files to detect re-reads and new changes
+- builds compact **Hot / Warm / Cold** state capsules instead of relying on the full task history
+- predicts the cheapest useful next action after each meaningful step
+- discovers project-specific test, build, lint, and typecheck commands
+- compresses noisy test, diff, and log output locally
+- preserves nearby diff context instead of stripping every unchanged line
+- defaults to a single worker and avoids multi-agent fan-out
+- keeps task-aware compression telemetry
+- stops/reassesses when model/retry budgets are exhausted
 
-## No extra model stack
+## Requirements
 
-Requirements:
-
-- existing Codex installation
-- existing ChatGPT/Codex sign-in
+- an existing Codex installation
+- an existing ChatGPT/Codex sign-in
 - Git
 - Python 3.10+
 
 No `OPENAI_API_KEY`, Ollama, DeepSeek/Anthropic key, paid proxy, or vector database is required.
 
-## Model policy
+## Model routing
+
+The default profiles follow current Codex subagent guidance:
 
 | Workload | Profile | Model | Reasoning |
 |---|---|---|---|
-| tiny/simple | `guard_fast` | `gpt-5.6-luna` | low |
+| tiny / obvious | `guard_fast` | `gpt-5.6-luna` | low |
 | normal coding | `guard_worker` | `gpt-5.6-terra` | medium |
-| difficult/high-risk | `guard_reasoner` | `gpt-5.6-sol` | high |
-| review only when needed | `guard_reviewer` | `gpt-5.6-luna` | medium |
+| harder bounded work | `guard_worker` | `gpt-5.6-terra` | high |
+| ambiguous / high-risk | `guard_reasoner` | `gpt-5.6` | high |
+| independent review | `guard_reviewer` | `gpt-5.6-terra` | high |
 
-Astra is deliberately **not selected automatically in v0.1**. If a configured model is unavailable, the Skill falls back to the current Codex agent while preserving the same usage policy.
+Astra is deliberately not selected automatically. The goal is usage conservation, not maximum reasoning on every task.
+
+If a configured profile/model is unavailable, the Skill tells Codex to keep the same budget and continue with the current available model rather than failing the task.
 
 ## Install on Windows
 
@@ -46,90 +54,226 @@ Open PowerShell:
 
     irm https://raw.githubusercontent.com/Animesh1097/codex-usage-guard/main/install.ps1 | iex
 
-The installer clones this project to `~/.codex-usage-guard`, installs the global Skill and agent profiles, installs the optional custom-prompt wrapper, and creates a stable local `guard.cmd` launcher.
+The installer:
+
+1. verifies Git, Codex, and Python
+2. verifies an existing install points to this repository
+3. updates/clones `~/.codex-usage-guard`
+4. installs the global Skill to `~/.agents/skills/usage-guard`
+5. installs the custom Codex agents under `$CODEX_HOME/agents`
+6. creates `guard.cmd`
+7. runs `guard doctor`
 
 Restart Codex after installation.
 
+For users who prefer not to pipe a remote script into PowerShell, clone the repository first, inspect `install.ps1`, and run it locally.
+
 ## Use
 
-Reliable Skill invocation:
+### Recommended: explicit Skill invocation
 
     $usage-guard fix the seller form and verify the build
 
-Codex can also automatically select the Skill when the task matches its description.
+Codex can also activate the Skill implicitly when the task matches its description.
 
-Where user custom prompts are supported:
+Codex CLI/IDE users can use `/skills` to inspect available Skills.
 
-    /prompts:harness fix the seller form and verify the build
+### Compatibility wrapper
 
-Custom prompt support has changed across Codex releases/frontends, so `$usage-guard` is the stable fallback. The project does not claim arbitrary first-class `/harness` commands are universally supported today.
+Some Codex CLI builds/frontends have supported user prompt wrappers such as:
 
-## Architecture
+    /prompts:harness fix the seller form
 
-    User objective
+This is a compatibility convenience, not the core integration. The supported design is the Codex Skill.
+
+## How a guarded task works
+
+    user objective
          |
          v
-    local classifier  -> complexity / risk / task type
-         |             -> context / retry budget
-         |             -> agent profile / reasoning policy
-         |             -> predicted next actions
-         v
-       Codex
+    local repo inspection
          |
-         +-> one selected worker profile
-         +-> narrow search and targeted reads
-         +-> deterministic tests/build/lint first
-         +-> local output compression
-         +-> bounded model/reasoning turns
+         +--> changed files / diff size
+         +--> sensitive paths
+         +--> test/build/lint/typecheck commands
+         +--> project type / package manager
+         |
+         v
+    task + risk classifier
+         |
+         +--> model profile
+         +--> reasoning effort
+         +--> context budget
+         +--> action/model/retry limits
+         |
+         v
+    persistent task state
+         |
+         +--> HOT: exact current evidence
+         +--> WARM: compact completed/recent state
+         +--> COLD: full local event history + hashes
+         |
+         v
+    Codex worker
+         |
          v
     local next-action predictor
          |
-         +-> inspect? edit? test? build? diff review? stop?
-         v
-    verified completion
+         +--> inspect
+         +--> edit
+         +--> targeted tests
+         +--> typecheck
+         +--> build
+         +--> lint
+         +--> diff review
+         +--> production verification
+         +--> stop
+         |
+         +----> repeat only while budget/evidence justify it
 
-## Local guard commands on Windows
+## Local control-plane commands
 
-Classify a task:
+The Skill runs these automatically, but they are also useful for debugging the harness.
 
-    & "$HOME\.codex-usage-guard\guard.cmd" plan --task "fix the login bug" --repo .
+Inspect a repository without a model call:
 
-Compress noisy test output:
+    & "$HOME\.codex-usage-guard\guard.cmd" inspect --repo .
 
-    npm test 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type test
+Create a guarded task:
 
-Compress a large diff:
+    & "$HOME\.codex-usage-guard\guard.cmd" start --task "fix the login bug" --repo .
 
-    git diff 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type git
+Show the compact context capsule:
 
-Predict the next action:
+    & "$HOME\.codex-usage-guard\guard.cmd" capsule --task-id <ID>
 
-    & "$HOME\.codex-usage-guard\guard.cmd" next --kind debugging --changed-files 2 --test-status pass
+Record a deterministic action:
 
-Show local compression telemetry:
+    & "$HOME\.codex-usage-guard\guard.cmd" record --task-id <ID> --action "targeted tests" --kind deterministic --outcome pass
+
+Record a model turn:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" record --task-id <ID> --action "implement fix" --kind model --outcome pass
+
+Ask for the cheapest useful next action:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" next --task-id <ID> --test-status pass --typecheck-status pass
+
+Show remaining budget:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" budget --task-id <ID>
+
+Compress test output:
+
+    npm test 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type test --task-id <ID>
+
+Compress a diff while preserving nearby context:
+
+    git diff 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type git --task-id <ID>
+
+Finish:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" finish --task-id <ID> --status completed
+
+Telemetry:
 
     & "$HOME\.codex-usage-guard\guard.cmd" stats
+    & "$HOME\.codex-usage-guard\guard.cmd" stats --task-id <ID>
 
-## Usage-first rules
+Health/version:
 
-1. **No multi-agent by default.** Extra agents must justify additional usage.
-2. **Deterministic evidence before reasoning.** Tests, Git, lint, build output, and exact searches come first.
-3. **Re-plan after evidence.** Do not blindly follow a stale long plan.
-4. **Bound retries.** A retry needs a changed hypothesis or new evidence.
-5. **Diff-first and targeted reads.** Avoid repeatedly loading unchanged files.
-6. **Stop deliberately.** Do not spend remaining budget after requirements are verified.
+    & "$HOME\.codex-usage-guard\guard.cmd" doctor
+    & "$HOME\.codex-usage-guard\guard.cmd" version
+
+## Budget behavior
+
+The guard separates three limits:
+
+- **action budget**: total meaningful steps
+- **model-turn budget**: additional Codex model work
+- **retry budget**: repeated attempts after a failure
+
+When the model-turn budget is exhausted, free deterministic checks can still run. The guard blocks more model turns without blocking tests, builds, lint, type checks, or diff review.
+
+A retry is only justified when the hypothesis or evidence changed.
+
+## Context temperatures
+
+### Hot
+
+Exact information required now:
+
+- objective
+- unresolved failures
+- currently changed files
+- sensitive changed files
+- exact errors, code, paths, IDs, hashes, SQL, routes, and environment-variable names relevant to the active step
+
+### Warm
+
+Compact reusable state:
+
+- completed actions
+- recent evidence
+- selected strategy/model/reasoning
+- available verification commands
+- file-hash changes since the last capsule
+
+### Cold
+
+Kept locally instead of repeatedly occupying model context:
+
+- full task event history
+- stale logs
+- superseded search output
+- unchanged content
+- old verbose command output
+
+## Compression policy
+
+Compression is deterministic and local.
+
+- test/log output keeps failure lines and surrounding evidence
+- Git diffs keep changed lines **plus nearby unchanged context**
+- ANSI formatting is removed
+- repeated identical lines are collapsed
+- exact failure diagnostics are preferred over prose summaries
+
+The compressor is not a secret scrubber. If an underlying command prints credentials, fix that leak at the source.
+
+## Offline benchmark
+
+Run:
+
+    python scripts/benchmark.py
+
+This checks routing regression fixtures and verifies that a noisy test log is actually reduced.
+
+It intentionally does **not** claim real Codex-plan savings. A public savings number should only be published after controlled real-world baseline-vs-guarded sessions.
 
 ## Development
 
-Run tests:
+Run everything locally:
 
+    python -m compileall -q guard scripts tests
     python -m unittest discover -s tests -v
+    python scripts/benchmark.py
 
-V0.1 has no runtime Python dependencies. GitHub Actions runs the test suite on Windows and Ubuntu with Python 3.11 and 3.13, and parses the PowerShell installer scripts on Windows.
+GitHub Actions runs Python 3.11 and 3.13 on Windows and Ubuntu, CLI smoke tests, the offline benchmark, and PowerShell parser validation.
 
-## Important limitation
+## Uninstall
 
-Codex plan/credit usage is not determined only by token count. Model choice, reasoning, tool use, task complexity, and execution can all affect usage. Telemetry reports **estimated context reduction**, not a guaranteed percentage increase in Codex allowance.
+    & "$HOME\.codex-usage-guard\uninstall.ps1"
+
+Task state and telemetry are preserved by default.
+
+To remove them too:
+
+    & "$HOME\.codex-usage-guard\uninstall.ps1" -PurgeData
+
+## Security
+
+See [SECURITY.md](SECURITY.md). Codex Usage Guard is not a sandbox and does not replace Codex permission controls.
 
 ## Independence notice
 
@@ -138,3 +282,5 @@ Codex Usage Guard is an independent open-source project. It is not affiliated wi
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
