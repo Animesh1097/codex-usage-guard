@@ -58,9 +58,9 @@ def make_capsule(task_id: str, *, root: Path = TASKS_ROOT) -> dict[str, Any]:
             },
         },
         "cold": {
-            "state_file": str(root / f"{task_id}.json"),
+            "state_storage": "local",
             "full_event_count": len(state.get("events", [])),
-            "tracked_file_hashes": len(state.get("file_hashes", {})),
+            "changed_file_hashes": len(state.get("file_hashes", {})),
         },
         "budget": budget_status(state),
     }
