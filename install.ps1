@@ -47,6 +47,6 @@ if ($Python -eq "py") {
 
 Write-Host ""
 Write-Host "Codex Usage Guard installed." -ForegroundColor Green
-Write-Host "Restart Codex, then use the usage-guard skill: $usage-guard <task>"
+Write-Host "Restart Codex, then use the usage-guard skill: `$usage-guard <task>"
 Write-Host "On Codex CLI versions that support custom prompts, you can also use: /prompts:harness <task>"
 Write-Host "No API key or Ollama is required. It uses your existing Codex sign-in."
