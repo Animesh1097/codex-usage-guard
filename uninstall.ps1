@@ -1,3 +1,7 @@
+param(
+    [switch]$PurgeData
+)
+
 $ErrorActionPreference = "Stop"
 
 $InstallRoot = Join-Path $HOME ".codex-usage-guard"
@@ -14,6 +18,9 @@ foreach ($agent in $Agents) {
     if (Test-Path $path) { Remove-Item -Force $path }
 }
 if (Test-Path $InstallRoot) { Remove-Item -Recurse -Force $InstallRoot }
-if (Test-Path $DataRoot) { Remove-Item -Recurse -Force $DataRoot }
+if ($PurgeData -and (Test-Path $DataRoot)) { Remove-Item -Recurse -Force $DataRoot }
 
 Write-Host "Codex Usage Guard removed." -ForegroundColor Green
+if (-not $PurgeData -and (Test-Path $DataRoot)) {
+    Write-Host "Task state and telemetry were preserved at $DataRoot. Re-run with -PurgeData to delete them."
+}
