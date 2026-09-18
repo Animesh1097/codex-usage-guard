@@ -1,6 +1,6 @@
 ---
 name: usage-guard
-description: Conserve Codex allowance while completing coding tasks. Use for implementation, debugging, refactoring, deployment checks, or repository investigation when context, retries, reasoning effort, model choice, and unnecessary agent loops should be minimized.
+description: Reduce Codex usage on coding tasks by budgeting model turns, compressing tool output, tracking task state, and choosing the cheapest useful next action.
 ---
 
 # Codex Usage Guard
