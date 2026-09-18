@@ -11,19 +11,28 @@ Treat the user's objective as the source of truth. Do not ask the user to choose
 
 Run the bundled deterministic planner before broad repository exploration.
 
-Windows PowerShell command:
+Windows PowerShell:
 
-    python "$HOME\.codex-usage-guard\scripts\guard_cli.py" plan --task "<USER_OBJECTIVE>" --repo .
+    & "$HOME\.codex-usage-guard\guard.cmd" plan --task "<USER_OBJECTIVE>" --repo .
 
-POSIX command:
+POSIX:
 
     python3 "$HOME/.codex-usage-guard/scripts/guard_cli.py" plan --task "<USER_OBJECTIVE>" --repo .
 
-Use the returned agent_profile, reasoning_effort, context_budget_tokens, max_model_turns, max_retries, and predicted_steps as hard guidance. Prefer a single agent. Never fan out agents merely because parallelism is available.
+Use agent_profile, reasoning_effort, context_budget_tokens, max_model_turns, max_retries, and predicted_steps as hard guidance. Never fan out agents merely because parallelism is available.
 
-If the requested custom agent profile is unavailable, continue with the current agent while preserving the same budget and reasoning policy.
+## 2. Route the work automatically
 
-## 2. Spend deterministic work before model work
+After classification, route the implementation to exactly one named agent profile from the plan when that profile is available. Give that agent only the objective, the budget, and the minimum relevant repository evidence. Keep the parent thread as a thin coordinator instead of duplicating exploration.
+
+- guard_fast: tiny/simple work, low reasoning.
+- guard_worker: normal implementation/debugging.
+- guard_reasoner: hard cross-system reasoning only.
+- guard_reviewer: independent review only when deterministic checks cannot establish correctness.
+
+If a requested profile or model is unavailable, continue with the current Codex agent while preserving the same budget and reasoning policy. Do not fail the task merely because a cheaper profile is unavailable.
+
+## 3. Spend deterministic work before model work
 
 Prefer, in order:
 
@@ -34,35 +43,28 @@ Prefer, in order:
 
 Do not reread unchanged files. Do not rescan the full repository after relevant files are known. Keep exact paths, code, error messages, stack frames, IDs, hashes, SQL, API routes, environment-variable names, and current user requirements lossless.
 
-## 3. Compress noisy tool output locally
+## 4. Compress noisy tool output locally
 
 When a command may produce large output, compress before feeding it back into the reasoning loop.
 
-Examples on Windows:
+Windows examples:
 
-    npm test 2>&1 | python "$HOME\.codex-usage-guard\scripts\guard_cli.py" compress --type test
-    git diff 2>&1 | python "$HOME\.codex-usage-guard\scripts\guard_cli.py" compress --type git
+    npm test 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type test
+    git diff 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type git
 
 Use --type log for build/server logs. Never compress away the exact failing diagnostic needed for a fix.
 
-## 4. Predict the next action instead of asking the user
+## 5. Predict the next action instead of asking the user
 
 After each meaningful state change, choose the cheapest useful next action. Use the local predictor when the decision is routine:
 
-    python "$HOME\.codex-usage-guard\scripts\guard_cli.py" next --kind <KIND> --changed-files <N> --test-status <not-run|pass|fail> --build-status <not-run|pass|fail|not-needed> --lint-status <not-run|pass|fail|not-needed>
+    & "$HOME\.codex-usage-guard\guard.cmd" next --kind <KIND> --changed-files <N> --test-status <not-run|pass|fail> --build-status <not-run|pass|fail|not-needed> --lint-status <not-run|pass|fail|not-needed>
 
 Recompute after new evidence. Do not blindly follow a stale long plan.
 
-## 5. Bounded agent policy
-
-- guard_fast: tiny/simple work, low reasoning.
-- guard_worker: normal implementation/debugging.
-- guard_reasoner: hard cross-system reasoning only.
-- guard_reviewer: independent review only when deterministic checks cannot establish correctness.
+## 6. Bounded agent and retry policy
 
 A subagent must receive only task-specific context, never the entire parent transcript. Spawn at most one concurrent subagent unless the user explicitly requests parallel work.
-
-## 6. Retry policy
 
 A failed attempt must produce new evidence. Never repeat the same search/edit/test cycle without a changed hypothesis.
 
