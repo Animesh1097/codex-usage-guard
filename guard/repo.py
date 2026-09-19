@@ -159,7 +159,12 @@ def _python_commands(root: Path) -> tuple[str | None, str | None, str | None]:
             except OSError:
                 pass
     text = "\n".join(chunks)
-    test = "python -m pytest" if ("pytest" in text or (root / "pytest.ini").exists()) else None
+    if "pytest" in text or (root / "pytest.ini").exists():
+        test = "python -m pytest"
+    else:
+        tests_dir = root / "tests"
+        has_unittest_suite = tests_dir.is_dir() and any(tests_dir.glob("test*.py"))
+        test = "python -m unittest discover -s tests -v" if has_unittest_suite else None
     lint = "python -m ruff check ." if "ruff" in text else None
     typecheck = "python -m mypy ." if "mypy" in text else None
     return test, lint, typecheck

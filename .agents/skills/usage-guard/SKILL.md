@@ -33,9 +33,11 @@ Ask the local predictor for the cheapest useful next step:
 
 If `record` rejects an action because a budget is exhausted, do not bypass it automatically. Reassess the hypothesis and only escalate when new evidence justifies another Codex turn.
 
-Compress noisy command output locally before it re-enters context:
+Use only verification commands reported by the guard's repo inspection or commands explicitly present in the repository configuration/CI. Never invent npm, Python, Rust, Go, Java, build, lint, or test commands. If no verification command is detected, inspect the minimum relevant project configuration before choosing one.
 
-    npm test 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type test --task-id <ID>
+Compress noisy command output locally before it re-enters context. Replace <DETECTED_TEST_COMMAND> with the actual command discovered for this repository:
+
+    <DETECTED_TEST_COMMAND> 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type test --task-id <ID>
     git diff 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type git --task-id <ID>
 
 ## Finish
