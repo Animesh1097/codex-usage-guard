@@ -65,6 +65,27 @@ class RepoTests(unittest.TestCase):
             profile = inspect_repo(root)
             self.assertEqual(profile.changed_lines, 2)
 
+    def test_detects_python_unittest_suite(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            init_repo(root)
+            (root / "pyproject.toml").write_text(
+                '[project]\nname = "sample"\nversion = "0.1.0"\n',
+                encoding="utf-8",
+            )
+            tests = root / "tests"
+            tests.mkdir()
+            (tests / "test_sample.py").write_text(
+                "import unittest\n\nclass SampleTest(unittest.TestCase):\n    def test_ok(self):\n        self.assertTrue(True)\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True, capture_output=True)
+
+            profile = inspect_repo(root)
+            self.assertEqual(profile.test_command, "python -m unittest discover -s tests -v")
+            self.assertIn("tests_available", profile.signals)
+
     def test_bun_uses_run_for_package_scripts(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
