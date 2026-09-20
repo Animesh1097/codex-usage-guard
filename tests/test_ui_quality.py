@@ -1,0 +1,65 @@
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from guard.repo import RepoProfile
+from guard.ui_quality import audit_ui, inspect_ui_context
+
+
+class UIQualityTests(unittest.TestCase):
+    def _profile(self, root: Path, changed: tuple[str, ...]) -> RepoProfile:
+        return RepoProfile(
+            root=str(root),
+            tracked_files=len(changed),
+            changed_files=changed,
+            project_types=("javascript",),
+        )
+
+    def test_audit_flags_accessibility_and_generated_ui_reflexes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = root / "src" / "Card.tsx"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                '<div onClick={save} className="border shadow-2xl rounded-3xl transition-all">Save</div>\n'
+                '<img src="/hero.png" />\n'
+                '<p className="uppercase tracking-widest">Overview</p>\n',
+                encoding="utf-8",
+            )
+            profile = self._profile(root, ("src/Card.tsx",))
+            with patch("guard.ui_quality.inspect_repo", return_value=profile):
+                result = audit_ui(root)
+
+            rules = {item["rule"] for item in result["findings"]}
+            self.assertIn("non-semantic-click-target", rules)
+            self.assertIn("missing-image-alt", rules)
+            self.assertIn("oversized-radius", rules)
+            self.assertIn("transition-all", rules)
+            self.assertIn("border-plus-heavy-shadow", rules)
+            self.assertIn("eyebrow-reflex", rules)
+            self.assertFalse(result["passes_strict_gate"])
+
+    def test_context_detects_existing_design_system(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "package.json").write_text(
+                '{"dependencies":{"tailwindcss":"1","@radix-ui/react-dialog":"1","lucide-react":"1"}}',
+                encoding="utf-8",
+            )
+            (root / "components.json").write_text("{}", encoding="utf-8")
+            css = root / "src" / "index.css"
+            css.parent.mkdir(parents=True)
+            css.write_text(":root { --surface: white; --ink: black; }", encoding="utf-8")
+            profile = self._profile(root, ())
+            with patch("guard.ui_quality.inspect_repo", return_value=profile):
+                result = inspect_ui_context(root)
+
+            self.assertIn("tailwind", result["styling"])
+            self.assertIn("radix", result["component_libraries"])
+            self.assertIn("shadcn", result["component_libraries"])
+            self.assertGreaterEqual(result["css_variable_count"], 2)
+
+
+if __name__ == "__main__":
+    unittest.main()
