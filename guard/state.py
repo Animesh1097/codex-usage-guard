@@ -126,9 +126,9 @@ def _visual_phase_for_action(action: str, kind: str) -> tuple[str, str]:
     text = action.lower()
     if any(word in text for word in ("test", "build", "lint", "typecheck", "browser", "verify", "diff", "review")):
         return "verify", "verification"
-    if any(word in text for word in ("inspect", "trace", "reproduce", "search", "read")) and kind != "model":
+    if any(word in text for word in ("inspect", "trace", "reproduce", "search", "read")):
         return "analyze", "inspection"
-    if any(word in text for word in ("plan", "map", "design", "shape", "outline", "scope")) and kind != "model":
+    if any(word in text for word in ("plan", "map", "design", "shape", "outline", "scope")):
         return "plan", "planning"
     return "work", "work"
 
