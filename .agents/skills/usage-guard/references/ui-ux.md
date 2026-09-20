@@ -170,3 +170,26 @@ For UI work, do not stop after implementation.
 9. **Review the final diff** and stop.
 
 Do not call a UI task complete merely because the code compiles or the build passes.
+
+
+## 12. Visual acceptance gate
+
+Before DONE, the rendered result should satisfy all applicable checks:
+
+- the primary action is visually dominant without competing accents
+- the first viewport has a clear reading order
+- typography roles are visibly distinct without excessive size jumps
+- content aligns to a consistent grid or shared edges
+- spacing rhythm is consistent across related groups
+- no accidental horizontal scroll, clipped text, overlapping controls, or truncated menus
+- mobile layout has intentional reordering/stacking rather than compressed desktop geometry
+- empty, loading, validation, error, and success states feel like the same product
+- interactive elements remain discoverable without relying on hover alone
+- keyboard focus is visible and sensible
+- decorative effects never reduce text legibility
+- one screen does not mix multiple unrelated radius, shadow, icon, or color systems
+- the result does not look like a default AI-generated SaaS template
+
+When a representative "before" screen exists, compare against it and preserve the product's strongest existing visual conventions unless the user explicitly requested a redesign.
+
+For new UI, prefer one strong coherent direction over many decorative ideas. If the first rendered pass is structurally sound but visually generic, spend the polish pass on composition, typography, spacing, and states—not extra gradients, cards, or animation.
