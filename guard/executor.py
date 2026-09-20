@@ -10,8 +10,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .budget import assert_action_allowed, budget_status
-from .state import DATA_ROOT, TASKS_ROOT, load_task, record_action, save_task
+from .state import DATA_ROOT, TASKS_ROOT, load_task, record_action, save_task, update_visual_state
 from .ui_quality import inspect_ui_context
+from .visualizer import spawn_visualizer
 from .usage import usage_snapshot
 
 
@@ -218,6 +219,15 @@ def enforce_task(
         requested_reasoning=requested_reasoning,
     )
 
+    production_run = root == TASKS_ROOT and runner is subprocess.run
+    if production_run:
+        visual = state.get("visual") or {}
+        if not visual.get("launched"):
+            launched = spawn_visualizer(task_id)
+            update_visual_state(task_id, phase="route", activity="routing", launched=launched, root=root)
+        else:
+            update_visual_state(task_id, phase="route", activity="routing", root=root)
+
     if not decision.requires_worker and not force_worker:
         execution = {
             **decision.to_dict(),
@@ -233,6 +243,9 @@ def enforce_task(
             "final_message": None,
         }
         state["execution"] = execution
+        visual = state.setdefault("visual", {})
+        visual["phase"] = "execute"
+        visual["activity"] = "work"
         save_task(state, root=root)
         return execution
 
@@ -254,8 +267,13 @@ def enforce_task(
             "budget": budget_status(state),
         }
         state["execution"] = execution
+        visual = state.setdefault("visual", {})
+        visual["phase"] = "failed"
+        visual["activity"] = "budget"
         save_task(state, root=root)
         return execution
+
+    update_visual_state(task_id, phase="execute", activity="work", root=root)
 
     executable = codex_executable or shutil.which("codex") or "codex"
     worker_root = DATA_ROOT / "workers"
@@ -299,6 +317,8 @@ def enforce_task(
         stdout = ""
         stderr = str(exc)
         exit_code = 2
+
+    update_visual_state(task_id, phase="verify", activity="route-check", root=root)
 
     worker_thread_id = parse_thread_id(stdout)
     worker_usage: dict[str, Any] | None = None
@@ -366,5 +386,8 @@ def enforce_task(
         "stderr_excerpt": stderr[-2000:] if stderr else None,
     }
     state["execution"] = execution
+    visual = state.setdefault("visual", {})
+    visual["phase"] = "verify" if route_status == "verified" else "failed"
+    visual["activity"] = "verification" if route_status == "verified" else "route-failure"
     save_task(state, root=root)
     return execution
