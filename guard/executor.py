@@ -11,6 +11,7 @@ from typing import Any, Callable
 
 from .budget import assert_action_allowed, budget_status
 from .state import DATA_ROOT, TASKS_ROOT, load_task, record_action, save_task
+from .ui_quality import inspect_ui_context
 from .usage import usage_snapshot
 
 
@@ -77,9 +78,25 @@ def _worker_prompt(state: dict[str, Any]) -> str:
         "typecheck": repo.get("typecheck_command"),
     }
     refs = plan.get("skill_refs") or []
-    skill_root = Path(__file__).resolve().parents[1] / ".agents" / "skills" / "usage-guard"
+    install_root = Path(__file__).resolve().parents[1]
+    skill_root = install_root / ".agents" / "skills" / "usage-guard"
     ref_paths = [str(skill_root / str(item)) for item in refs]
     refs_text = ", ".join(ref_paths) if ref_paths else "none"
+    ui_relevant = "references/ui-ux.md" in refs
+    ui_context: dict[str, Any] | None = None
+    ui_gate = ""
+    if ui_relevant:
+        ui_context = inspect_ui_context(str(state.get("repo_root") or "."))
+        guard_cli = install_root / "scripts" / "guard_cli.py"
+        ui_gate = (
+            "This is UI-relevant work. Do not accept a generic first pass. "
+            "Shape the hierarchy and interaction first, implement in the existing design system, then run a polish pass. "
+            f"Compact existing UI context: {json.dumps(ui_context, ensure_ascii=False)}. "
+            "After editing, run the deterministic UI quality gate on the changed UI files: "
+            f'python "{guard_cli}" ui-audit --repo . --strict --json. '
+            "Treat blocker/important findings as defects unless the repository clearly and intentionally requires them. "
+            "When browser tooling is available and rendered behavior matters, verify desktop and narrow viewport states before DONE. "
+        )
     return (
         "You are the single pinned execution worker for Codex Usage Guard. "
         "Do not invoke $usage-guard, do not spawn subagents, and do not change the requested model. "
@@ -90,6 +107,7 @@ def _worker_prompt(state: dict[str, Any]) -> str:
         f"Context budget target: {plan.get('context_budget_tokens', 'unknown')} tokens. "
         f"Relevant craft reference files selected by the guard: {refs_text}. "
         "Read only those reference files when they exist, then apply their principles. Do not load unrelated guides. "
+        f"{ui_gate}"
         f"Detected verification commands: {json.dumps(verification, ensure_ascii=False)}. "
         "Do not invent verification commands. "
         "Make the smallest complete change, run only justified deterministic checks, review the final diff, "

@@ -19,6 +19,15 @@ class CapabilityTests(unittest.TestCase):
         self.assertIn("references/browser-verification.md", refs)
         self.assertLessEqual(len(refs), 2)
 
+    def test_ui_bug_still_loads_ui_browser_refs(self):
+        refs = recommend_skill_refs(
+            "fix the mobile layout overlap and verify the responsive screen",
+            BASE,
+            "debugging",
+        )
+        self.assertIn("references/ui-ux.md", refs)
+        self.assertIn("references/browser-verification.md", refs)
+
     def test_architecture_task_loads_system_design(self):
         refs = recommend_skill_refs(
             "design the API and database schema for a multi-tenant CRM",
