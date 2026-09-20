@@ -48,7 +48,7 @@ class StateTests(unittest.TestCase):
             loaded = load_task(task_id, root=state_root)
             status = budget_status(loaded)
             self.assertFalse(status["may_continue"])
-            self.assertIn(loaded["visual"]["phase"], {"execute", "verify"})
+            self.assertIn(loaded["visual"]["phase"], {"work", "verify"})
 
     def test_capsule_tracks_hash_change_without_full_history(self):
         with tempfile.TemporaryDirectory() as repo_td, tempfile.TemporaryDirectory() as state_td:
