@@ -4,11 +4,16 @@
 
 It does not replace Codex and it does not run another LLM. It adds deterministic local policy around Codex so model strength, reasoning effort, context, retries, verification, and subagents are used only when justified.
 
-> **v0.5 developer preview**. Usage Guard now enforces its selected execution route from inside an already-open Codex session and verifies the worker route from local Codex thread metadata. It still does not claim guaranteed allowance savings.
+> **v0.6 developer preview**. Usage Guard now includes a compact visual Guard HUD on top of the v0.5 verified execution routing. It still does not claim guaranteed allowance savings.
 
-## What v0.5 does
+## What v0.6 does
 
 - makes **`$usage-guard` inside Codex the normal workflow** after one-time installation
+- adds a small animated **Guard HUD** so progress is visible without reading raw JSON
+- uses five visual stages: analyze → judge → route → execute → verify
+- skips the judge node visually until the adaptive judge is actually used
+- shows coordinator → requested model routing, reasoning level, action/model-turn gauges, worker token total, and route outcome
+- automatically animates on a live terminal and falls back to a single compact visual snapshot when animation is unavailable
 - compares the current coordinator model/reasoning with the selected route
 - when they differ, launches exactly one pinned `codex exec` worker with the selected `--model` and `model_reasoning_effort`
 - verifies the worker's observed model and reasoning from Codex local thread metadata before calling the route successful
@@ -100,13 +105,45 @@ At any time inside Codex:
     $usage-guard status
     $usage-guard usage
 
-The status view includes the selected route, coordinator model/reasoning, verified effective execution model/reasoning, route-enforcement status, dedicated worker token usage when applicable, remaining action/model/retry budget, detected verification commands, relevant craft references, and before/current usage deltas.
+`$usage-guard status` now defaults to the compact visual HUD instead of a JSON dump. The five nodes represent analyze, optional judge, route, execute, and verify. The second line visualizes coordinator → requested model routing, while the bars show action/model-turn consumption and the token counter shows the dedicated worker total when available.
+
+For machine-readable diagnostics, the Skill uses:
+
+    guard.cmd status --task-id <ID> --json
+
+That JSON still includes selected route, coordinator model/reasoning, verified effective execution model/reasoning, route-enforcement status, dedicated worker token usage, remaining budgets, verification commands, craft references, and before/current usage deltas.
 
 A coordinator status line can therefore still show Luna while the actual task runs on a verified Terra/GPT-5.6 pinned worker. `$usage-guard status` is the source of truth for requested versus actual execution route.
 
 When the task finishes, Usage Guard reports the measured token delta when available. If the task started in a new pre-session launcher and no same-thread baseline exists, it can fall back to an approximate global token delta; concurrent Codex sessions can make that fallback noisy.
 
-### Route enforcement
+### Guard HUD
+
+The default guarded execution view is deliberately small:
+
+    ╭──────────────────────────────╮
+    │  ●━━·━━●━━◐━━○              │
+    │  luna     ──► terra      M   │
+    │  ███░░░░░  3/10  ◇ ██░░░   │
+    │  ◒ 9,876                 ◌   │
+    ╰──────────────────────────────╯
+
+The visual language is:
+
+- first node: deterministic analysis
+- second node: adaptive judge (dot when skipped)
+- third node: route selection
+- fourth node: execution
+- fifth node: verification
+- model arrow: coordinator → requested execution model
+- first gauge: action budget
+- second gauge: model-turn budget
+- token counter: dedicated worker token total when measurable
+- final symbol: pending / verified / failed
+
+The HUD has no third-party UI dependency. On a real terminal it redraws in place; on captured/non-interactive output it prints one stable final snapshot rather than flooding logs with animation frames.
+
+
 
 For every new guarded task, the Skill runs:
 
