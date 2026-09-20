@@ -23,6 +23,7 @@ from .state import finish_task, latest_active_task_id, load_task, record_action,
 from .telemetry import aggregate, record_compression, record_task_summary
 from .ui_quality import audit_ui, inspect_ui_context
 from .usage import usage_delta, usage_snapshot
+from .visualizer import can_open_window
 
 
 def _json(data: object) -> None:
@@ -222,7 +223,12 @@ def cmd_enforce(args: argparse.Namespace) -> int:
         model_turns_limit=budget["limits"]["model_turns"],
         judge_used=bool(state.get("judgement")),
     )
-    hud = AnimatedHUD(hud_state, enabled=False if args.json else None)
+    graphical_expected = (
+        not args.json
+        and os.environ.get("CODEX_USAGE_GUARD_DISABLE_VISUAL") != "1"
+        and can_open_window()
+    )
+    hud = AnimatedHUD(hud_state, enabled=False if (args.json or graphical_expected) else None)
     hud.start()
     try:
         result = enforce_task(
@@ -243,8 +249,10 @@ def cmd_enforce(args: argparse.Namespace) -> int:
 
     if args.json:
         _json(result)
-    elif not hud.enabled:
-        print(visual_snapshot(final_state))
+    else:
+        visual = final_state.get("visual") or {}
+        if not visual.get("launched") and not hud.enabled:
+            print(visual_snapshot(final_state))
     return 0 if result.get("status") in {"parent-match", "verified"} else 3
 
 
