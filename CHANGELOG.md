@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.0
+
+- substantially strengthen the UI/UX quality policy for product and brand surfaces
+- add deterministic UI context detection for existing styling systems, component libraries, token files, and CSS variables
+- add a zero-model `ui-audit` quality gate for common accessibility and generated-UI regressions
+- audit changed UI files first so existing unrelated design debt does not block focused tasks
+- detect issues such as non-semantic click targets, missing image alt text, removed focus rings, gradient text, decorative stripes, arbitrary z-indexes, transition-all, bounce motion, oversized radii, and repeated eyebrow-label patterns
+- inject compact existing-design context into pinned UI workers before they edit
+- require UI workers to run the deterministic audit after editing
+- broaden UI skill routing so responsive/design/polish tasks still receive UI guidance even when classified as debugging
+- require an inspect -> shape -> implement -> audit -> render -> critique -> polish -> diff-review loop for UI tasks
+- add AI UX Playground, Impeccable, Jakub Krehel's design skills, Taste Skill, and Vercel Web Interface Guidelines to third-party research/attribution
+- validate `pyproject.toml` in CI and repair the malformed v0.6 version string
+
+
 ## 0.6.0
 
 - add a compact zero-dependency Guard HUD for guarded-task progress
