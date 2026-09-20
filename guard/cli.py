@@ -167,7 +167,9 @@ def cmd_status(args: argparse.Namespace) -> int:
     if args.json:
         _json(_status_payload(state))
     else:
-        print(visual_snapshot(state))
+        display_state = dict(state)
+        display_state["execution"] = enforcement_status(state)
+        print(visual_snapshot(display_state))
     return 0
 
 
