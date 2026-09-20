@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0
+
+- global `cguard` launcher for Windows
+- local task classification before Codex starts
+- explicit Codex `--cd` project root at launch
+- automatic launch-time model selection with `--model`
+- automatic launch-time reasoning selection with `model_reasoning_effort`
+- pre-created guarded task state reused by the Skill instead of duplicated
+- dry-run route preview that does not start Codex or create task state
+- direct Skill mode documented as secondary when parent-model switching matters
+
+## 0.2.1
+
+- detect standard-library Python `unittest` suites
+- prevent invented verification commands in the Skill
+- ignore the generated local Windows `guard.cmd` launcher
+
 ## 0.2.0
 
 - repo-aware task/risk classification
