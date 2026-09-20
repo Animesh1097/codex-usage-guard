@@ -187,7 +187,7 @@ class AnimatedHUD:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=max(1.0, self.interval * 4))
-        self._draw(0)
+        self._draw(1)
 
 
 def visual_snapshot(state: dict[str, Any], *, phase: str = "verify") -> str:
