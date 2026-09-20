@@ -32,7 +32,7 @@ def start_task(task: str, plan: dict[str, Any], repo: RepoProfile, *, root: Path
         repo_root=repo.root if active_thread else None,
     )
     state = {
-        "version": 3,
+        "version": 4,
         "task_id": task_id,
         "objective": task,
         "repo_root": repo.root,
@@ -51,6 +51,7 @@ def start_task(task: str, plan: dict[str, Any], repo: RepoProfile, *, root: Path
             "finish": None,
             "delta": None,
         },
+        "execution": None,
     }
     path = _task_path(task_id, root)
     path.parent.mkdir(parents=True, exist_ok=True)
