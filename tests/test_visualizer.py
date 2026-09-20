@@ -1,6 +1,6 @@
 import unittest
 
-from guard.visualizer import activity_from_state, model_palette, phase_from_state
+from guard.visualizer import PixelFactory, activity_from_state, model_palette, phase_from_state
 
 
 class VisualizerStateTests(unittest.TestCase):
@@ -23,6 +23,25 @@ class VisualizerStateTests(unittest.TestCase):
     def test_model_palettes_are_distinct(self):
         self.assertNotEqual(model_palette("gpt-5.6-luna"), model_palette("gpt-5.6-terra"))
         self.assertNotEqual(model_palette("gpt-5.6-terra"), model_palette("gpt-5.6"))
+
+    def test_pipe_uses_valid_tk_joinstyle_option(self):
+        calls = []
+
+        class Canvas:
+            def create_line(self, *args, **kwargs):
+                calls.append(kwargs)
+                if "jointstyle" in kwargs:
+                    raise AssertionError("Tk Canvas uses joinstyle, not jointstyle")
+
+            def create_oval(self, *args, **kwargs):
+                pass
+
+        factory = PixelFactory.__new__(PixelFactory)
+        factory.canvas = Canvas()
+        factory._pipe([0, 0, 10, 0, 10, 10])
+
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(all(call.get("joinstyle") == "miter" for call in calls))
 
 
 if __name__ == "__main__":
