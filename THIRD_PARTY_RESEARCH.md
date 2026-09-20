@@ -44,3 +44,34 @@ Usage Guard does not vendor these skills. Its UI reference and detector rules ar
 - mryll/codexbar: https://github.com/mryll/codexbar — MIT
 
 Ideas adapted: read-only inspection of Codex's local state database and rollout telemetry. Usage Guard never reads or forwards Codex auth tokens and never calls private usage endpoints.
+
+
+## v1 adoption and architecture research
+
+The v1 architecture review also studied high-adoption developer tools and frameworks including:
+
+- starship/starship — compiled cross-shell binary and low-friction distribution
+- jesseduffield/lazygit — focused developer workflow with a polished interactive UI
+- sharkdp/bat — narrow problem definition, excellent default UX, single-binary distribution
+- tauri-apps/tauri — Rust backend + web UI + native bundling
+- storybookjs/storybook — extension ecosystem and visual-first documentation
+- facebook/docusaurus — docs-first onboarding
+- vitejs/vite — minimal defaults, fast feedback loop, typed/plugin-friendly interfaces
+- neovim/neovim — stable core with external UI/plugin boundaries
+- ohmyzsh/ohmyzsh — community extension model and simple onboarding
+- yt-dlp/yt-dlp — example that Python itself does not prevent large adoption when packaging/value are strong
+
+Patterns adopted for v1:
+- compiled deterministic core with explicit contracts
+- visual layer separated from execution correctness
+- single-command / release-asset distribution as a release goal
+- demo-first onboarding
+- fixture-driven parity during migration
+- extensibility only after core contracts stabilize
+
+Patterns intentionally **not** copied yet:
+- mandatory cloud telemetry
+- large plugin marketplaces before a stable API exists
+- social/community infrastructure before installation and reliability are strong
+- decorative dashboards without operational value
+- performance claims without reproducible benchmark data

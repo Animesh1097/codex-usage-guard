@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0a1
+
+- begin incremental migration from the Python prototype to a compiled Rust deterministic core
+- add Rust policy, budget, verification-state, and next-action primitives
+- add shared policy fixtures exercised by both Python and Rust
+- add a Tauri v2 visual companion scaffold with a modern web-rendered task scene
+- keep the visual companion read-only and non-critical to guarded execution
+- prefer a compiled visualizer when installed, with Tkinter and terminal fallbacks preserved
+- extend doctor output with visualizer backend detection
+- add Rust core and Windows Tauri compilation to CI
+- add v1 architecture, benchmark methodology, roadmap, contribution guidance, and quick-start docs
+- document adoption patterns researched from high-signal open-source developer tools
+- keep current-session Codex execution and opt-in-only model routing unchanged
+
+
 ## 0.9.0
 
 - keep normal `$usage-guard` work in the user's current Codex session

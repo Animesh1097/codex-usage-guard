@@ -23,7 +23,7 @@ from .state import finish_task, latest_active_task_id, load_task, record_action,
 from .telemetry import aggregate, record_compression, record_task_summary
 from .ui_quality import audit_ui, inspect_ui_context
 from .usage import usage_delta, usage_snapshot
-from .visualizer import can_open_window, spawn_visualizer
+from .visualizer import can_open_window, spawn_visualizer, visualizer_command
 
 
 def _json(data: object) -> None:
@@ -422,6 +422,11 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     git_version = _command_version("git")
     codex_version = _command_version("codex")
     browser_harness_version = _command_version("browser-harness")
+    visual_command = visualizer_command("__doctor__")
+    visual_backend = None
+    if visual_command:
+        first = Path(visual_command[0]).name.lower()
+        visual_backend = "tauri" if "usage-guard-visualizer" in first else "tkinter"
     checks = {
         "usage_guard_version": __version__,
         "python": sys.version.split()[0],
@@ -430,6 +435,8 @@ def cmd_doctor(_: argparse.Namespace) -> int:
         "codex": codex_version,
         "browser_harness": browser_harness_version,
         "browser_use_cloud_configured": bool(os.environ.get("BROWSER_USE_API_KEY")),
+        "visualizer_backend": visual_backend,
+        "compiled_visualizer_available": visual_backend == "tauri",
         "ready": bool(python_ok and git_version and codex_version),
     }
     _json(checks)

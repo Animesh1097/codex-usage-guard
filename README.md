@@ -2,13 +2,18 @@
 
 **Codex Usage Guard** is a local, zero-extra-API-key control plane for OpenAI Codex. Its purpose is to make coding sessions more efficient and more reliable through repository-aware planning, bounded work loops, compact context, deterministic verification, usage measurement, and task-specific craft guidance.
 
-It does not replace Codex and it does not run another LLM by default. **v0.9 keeps the user's currently selected Codex model and reasoning mode unchanged unless the user explicitly opts into advanced model routing.**
+It does not replace Codex and it does not run another LLM by default. The normal workflow keeps the user's currently selected Codex model and reasoning mode unchanged unless the user explicitly opts into advanced model routing.
 
-> **v0.9 developer preview.** The normal workflow is current-session execution with a redesigned live task visualizer and stronger UI/UX acceptance checks. Usage Guard measures local usage telemetry but does not claim guaranteed allowance savings.
+> **v1.0 alpha foundation.** The working Python runtime remains compatible while deterministic subsystems migrate behind tests to a Rust core. A Tauri visual companion is being introduced as a read-only, non-critical presentation layer. Usage Guard measures local usage telemetry but does not claim guaranteed allowance savings.
 
-## What v0.9 does
+## What the v1 alpha adds
 
 - keeps `$usage-guard` work in the **current Codex session by default**
+- introduces `crates/usage-guard-core` for deterministic Rust policy/budget/next-action logic
+- adds fixture-driven parity so Rust behavior can be checked before replacing Python subsystems
+- introduces a Tauri v2 visual companion with a modern web-rendered workflow scene
+- keeps the visual companion read-only and non-critical: core guard work must continue if the UI fails
+- prefers a compiled visualizer automatically when one is installed, with the existing Python/Tkinter view as fallback
 - does not automatically switch models, change reasoning effort, or spawn a pinned Codex worker
 - leaves `cguard` / legacy route enforcement available only as explicit advanced opt-in tools
 - launches the graphical task visualizer when a desktop GUI is available
@@ -29,12 +34,18 @@ It does not replace Codex and it does not run another LLM by default. **v0.9 kee
 - avoids multi-agent fan-out by default
 - stops/reassesses when additional model work is no longer justified
 
+## Quick start
+
+See [docs/quickstart.md](docs/quickstart.md) for the shortest install → first-task → status workflow.
+
+The v1 migration plan is in [ROADMAP.md](ROADMAP.md), and the architecture boundary is documented in [docs/architecture/v1-alpha.md](docs/architecture/v1-alpha.md).
+
 ## Requirements
 
 - an existing Codex installation
 - an existing ChatGPT/Codex sign-in
 - Git
-- Python 3.10+
+- Python 3.10+ for the compatibility runtime during the v1 migration
 
 No `OPENAI_API_KEY`, Ollama, DeepSeek/Anthropic key, paid proxy, or vector database is required.
 
@@ -112,7 +123,7 @@ There is no fake percent-complete meter. The active task block stays at the real
 
 The visual theme is based on task type rather than model choice, so normal use does not imply or advertise model switching.
 
-The visualizer is local, uses the Python standard GUI toolkit, and requires no additional API key or hosted UI service. If the graphical window cannot open, Usage Guard falls back to a compact model-neutral terminal HUD.
+The visualizer is local and requires no additional API key or hosted UI service. The v1 alpha includes a Tauri visual companion scaffold; when a compiled companion is installed Usage Guard prefers it automatically. The current Python/Tkinter visualizer remains the fallback during migration. If no graphical window can open, Usage Guard falls back to a compact model-neutral terminal HUD.
 
 Disable the graphical visualizer with:
 
@@ -362,3 +373,26 @@ Codex Usage Guard is an independent open-source project. It is not affiliated wi
 MIT. See [LICENSE](LICENSE).
 
 See [CHANGELOG.md](CHANGELOG.md) for version history.
+
+
+## v1 migration status
+
+The project is deliberately avoiding a big-bang rewrite.
+
+Current alpha foundation:
+- Rust workspace with deterministic policy, budget, and next-action primitives
+- shared policy fixtures
+- Tauri v2 visual companion scaffold
+- read-only task snapshot bridge
+- compiled-visualizer preference with Python fallback
+- Rust/Tauri CI jobs
+- benchmark methodology that forbids unsupported savings claims
+
+Still on the compatibility runtime:
+- repository inspection
+- state persistence/migrations
+- Codex local usage adapters
+- output compression
+- full installer/release packaging
+
+See [ROADMAP.md](ROADMAP.md) for the migration gates.

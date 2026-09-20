@@ -1,0 +1,34 @@
+[
+  {
+    "name": "tiny copy change",
+    "complexity": 1,
+    "risk": 1,
+    "strategy": "single-turn",
+    "max_actions": 6,
+    "max_model_turns": 2
+  },
+  {
+    "name": "normal multi-file feature",
+    "complexity": 4,
+    "risk": 4,
+    "strategy": "single-agent",
+    "max_actions": 10,
+    "max_model_turns": 4
+  },
+  {
+    "name": "moderate production fix",
+    "complexity": 7,
+    "risk": 6,
+    "strategy": "bounded-loop",
+    "max_actions": 14,
+    "max_model_turns": 5
+  },
+  {
+    "name": "high-risk migration",
+    "complexity": 9,
+    "risk": 9,
+    "strategy": "plan-execute-verify",
+    "max_actions": 16,
+    "max_model_turns": 6
+  }
+]

@@ -47,3 +47,32 @@ jobs:
               exit 1
             }
           }
+
+
+  rust-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test Rust core
+        run: cargo test -p usage-guard-core
+      - name: Smoke Rust core CLI
+        run: cargo run --quiet -p usage-guard-core --bin usage-guard-core -- policy 4 4
+
+  visualizer-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Validate Tauri config JSON
+        shell: pwsh
+        run: |
+          Get-Content apps/visualizer/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json | Out-Null
+      - name: Build Tauri visual companion
+        run: cargo build --release --manifest-path apps/visualizer/src-tauri/Cargo.toml
+      - name: Upload Windows visualizer alpha
+        uses: actions/upload-artifact@v4
+        with:
+          name: usage-guard-visualizer-windows-x64
+          path: apps/visualizer/src-tauri/target/release/usage-guard-visualizer.exe
+          if-no-files-found: error
