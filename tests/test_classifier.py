@@ -14,9 +14,19 @@ def init_repo(root: Path) -> None:
 
 
 class ClassifierTests(unittest.TestCase):
-    def test_simple_task_uses_fast_profile(self):
+    def test_simple_task_preserves_current_session_by_default(self):
         plan = classify_task("change the footer phone number", repo_path="/definitely/not/a/repo")
         self.assertLessEqual(plan.complexity, 2)
+        self.assertEqual(plan.agent_profile, "current_session")
+        self.assertEqual(plan.preferred_model, "current")
+        self.assertEqual(plan.reasoning_effort, "current")
+
+    def test_explicit_routing_keeps_advanced_model_policy(self):
+        plan = classify_task(
+            "change the footer phone number",
+            repo_path="/definitely/not/a/repo",
+            route_models=True,
+        )
         self.assertEqual(plan.agent_profile, "guard_fast")
         self.assertEqual(plan.preferred_model, "gpt-5.6-luna")
         self.assertEqual(plan.reasoning_effort, "low")
@@ -25,6 +35,7 @@ class ClassifierTests(unittest.TestCase):
         plan = classify_task(
             "Investigate an intermittent production authentication failure, find root cause, fix it, and verify deployment",
             repo_path="/definitely/not/a/repo",
+            route_models=True,
         )
         self.assertGreaterEqual(plan.complexity, 8)
         self.assertGreaterEqual(plan.risk, 6)
