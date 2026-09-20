@@ -1,28 +1,32 @@
 import unittest
 
-from guard.visualizer import PixelFactory, activity_from_state, model_palette, phase_from_state
+from guard.visualizer import PixelFactory, activity_from_state, phase_from_state, task_kind_from_state, task_palette
 
 
 class VisualizerStateTests(unittest.TestCase):
     def test_visual_phase_takes_priority(self):
         state = {
-            "visual": {"phase": "execute", "activity": "file_change"},
-            "execution": {"status": "pending-worker"},
+            "visual": {"phase": "work", "activity": "file_change"},
+            "status": "active",
         }
-        self.assertEqual(phase_from_state(state), "execute")
+        self.assertEqual(phase_from_state(state), "work")
         self.assertEqual(activity_from_state(state), "file_change")
 
-    def test_verified_execution_becomes_complete(self):
-        state = {"execution": {"status": "verified"}}
-        self.assertEqual(phase_from_state(state), "complete")
+    def test_old_route_and_execute_states_map_to_new_workflow(self):
+        self.assertEqual(phase_from_state({"visual": {"phase": "route"}}), "plan")
+        self.assertEqual(phase_from_state({"visual": {"phase": "execute"}}), "work")
 
-    def test_failed_execution_becomes_failed(self):
-        state = {"execution": {"status": "model-mismatch"}}
-        self.assertEqual(phase_from_state(state), "failed")
+    def test_completed_task_becomes_complete(self):
+        self.assertEqual(phase_from_state({"status": "completed"}), "complete")
 
-    def test_model_palettes_are_distinct(self):
-        self.assertNotEqual(model_palette("gpt-5.6-luna"), model_palette("gpt-5.6-terra"))
-        self.assertNotEqual(model_palette("gpt-5.6-terra"), model_palette("gpt-5.6"))
+    def test_failed_task_becomes_failed(self):
+        self.assertEqual(phase_from_state({"status": "failed"}), "failed")
+
+    def test_task_palette_is_based_on_task_kind_not_model(self):
+        ui = {"plan": {"task_kind": "ui"}}
+        debugging = {"plan": {"task_kind": "debugging"}}
+        self.assertEqual(task_kind_from_state(ui), "ui")
+        self.assertNotEqual(task_palette("ui"), task_palette("debugging"))
 
     def test_pipe_uses_valid_tk_joinstyle_option(self):
         calls = []
