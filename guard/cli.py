@@ -21,6 +21,7 @@ from .next_action import predict_next_action
 from .repo import inspect_repo
 from .state import finish_task, latest_active_task_id, load_task, record_action, start_task
 from .telemetry import aggregate, record_compression, record_task_summary
+from .ui_quality import audit_ui, inspect_ui_context
 from .usage import usage_delta, usage_snapshot
 
 
@@ -176,6 +177,32 @@ def cmd_status(args: argparse.Namespace) -> int:
 def cmd_usage(args: argparse.Namespace) -> int:
     profile = inspect_repo(args.repo)
     _json(usage_snapshot(repo_root=profile.root))
+    return 0
+
+
+def cmd_ui_context(args: argparse.Namespace) -> int:
+    _json(inspect_ui_context(args.repo))
+    return 0
+
+
+def cmd_ui_audit(args: argparse.Namespace) -> int:
+    result = audit_ui(args.repo, max_files=args.max_files)
+    if args.json:
+        _json(result)
+    else:
+        counts = result["counts"]
+        print(
+            f"UI quality: {counts['blocker']} blocker / "
+            f"{counts['important']} important / {counts['polish']} polish "
+            f"across {result['files_scanned']} file(s)"
+        )
+        for item in result["findings"]:
+            print(
+                f"{item['severity'].upper():9} {item['path']}:{item['line']} "
+                f"[{item['rule']}] {item['message']}"
+            )
+    if args.strict and not result["passes_strict_gate"]:
+        return 2
     return 0
 
 
@@ -445,6 +472,17 @@ def build_parser() -> argparse.ArgumentParser:
     usage = sub.add_parser("usage", help="read current Codex token/rate-limit telemetry locally")
     usage.add_argument("--repo", default=".")
     usage.set_defaults(func=cmd_usage)
+
+    ui_context = sub.add_parser("ui-context", help="inspect the repository's existing UI styling and component system")
+    ui_context.add_argument("--repo", default=".")
+    ui_context.set_defaults(func=cmd_ui_context)
+
+    ui_audit = sub.add_parser("ui-audit", help="run a deterministic audit for common UI/accessibility quality regressions")
+    ui_audit.add_argument("--repo", default=".")
+    ui_audit.add_argument("--max-files", type=int, default=200)
+    ui_audit.add_argument("--strict", action="store_true", help="exit non-zero when important/blocker findings remain")
+    ui_audit.add_argument("--json", action="store_true", help="emit machine-readable findings")
+    ui_audit.set_defaults(func=cmd_ui_audit)
 
     enforce = sub.add_parser("enforce", help="enforce the selected model/reasoning with a pinned Codex exec worker when needed")
     enforce.add_argument("--task-id", required=True)
