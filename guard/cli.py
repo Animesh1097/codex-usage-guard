@@ -12,6 +12,7 @@ from .budget import budget_status
 from .classifier import classify_task
 from .compressor import compress, estimate_tokens
 from .context import make_capsule
+from .launcher import prepare_launch, preview_launch, resolve_launch_input, run_codex
 from .next_action import predict_next_action
 from .repo import inspect_repo
 from .state import finish_task, load_task, record_action, start_task
@@ -188,6 +189,42 @@ def cmd_next(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_launch(args: argparse.Namespace) -> int:
+    repo_root, task = resolve_launch_input(args.items, args.repo)
+    if not task:
+        if not sys.stdin.isatty():
+            print("A task is required when input is non-interactive.", file=sys.stderr)
+            return 2
+        try:
+            task = input("What should Codex do? ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("")
+            return 130
+        if not task:
+            print("No task supplied.", file=sys.stderr)
+            return 2
+
+    if args.dry_run:
+        _json(preview_launch(task, repo_root))
+        return 0
+
+    spec = prepare_launch(task, repo_root)
+    limits = spec.budget.get("limits", {})
+    print(f"Codex Usage Guard {__version__}")
+    print(f"Project:   {spec.repo_root}")
+    print(f"Task ID:   {spec.task_id}")
+    print(f"Route:     {spec.preferred_model} / {spec.reasoning_effort}")
+    print(f"Profile:   {spec.agent_profile}")
+    print(
+        "Budget:    "
+        f"{limits.get('actions', '?')} actions / "
+        f"{limits.get('model_turns', '?')} model turns / "
+        f"{limits.get('retries', '?')} retries"
+    )
+    print("Launching Codex with the selected model before the first turn...")
+    return run_codex(spec)
+
+
 def cmd_stats(args: argparse.Namespace) -> int:
     _json(aggregate(task_id=args.task_id))
     return 0
@@ -276,6 +313,12 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("--attempts", type=int, default=0)
     n.add_argument("--max-retries", type=int, default=2)
     n.set_defaults(func=cmd_next)
+
+    launch = sub.add_parser("launch", help="classify locally, then launch Codex with the selected model and reasoning")
+    launch.add_argument("items", nargs="*", help="task text; an explicit existing directory may be supplied first")
+    launch.add_argument("--repo", default=".", help="project directory; defaults to the current directory")
+    launch.add_argument("--dry-run", action="store_true", help="show the selected route without starting Codex or creating task state")
+    launch.set_defaults(func=cmd_launch)
 
     st = sub.add_parser("stats", help="show local compression telemetry")
     st.add_argument("--task-id")
