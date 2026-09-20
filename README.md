@@ -4,11 +4,15 @@
 
 It does not replace Codex and it does not run another LLM. It adds deterministic local policy around Codex so model strength, reasoning effort, context, retries, verification, and subagents are used only when justified.
 
-> **v0.4 developer preview**. Usage Guard can measure local Codex token deltas and coarse account-meter deltas, but it does not claim guaranteed allowance savings.
+> **v0.5 developer preview**. Usage Guard now enforces its selected execution route from inside an already-open Codex session and verifies the worker route from local Codex thread metadata. It still does not claim guaranteed allowance savings.
 
-## What v0.4 does
+## What v0.5 does
 
 - makes **`$usage-guard` inside Codex the normal workflow** after one-time installation
+- compares the current coordinator model/reasoning with the selected route
+- when they differ, launches exactly one pinned `codex exec` worker with the selected `--model` and `model_reasoning_effort`
+- verifies the worker's observed model and reasoning from Codex local thread metadata before calling the route successful
+- fails closed instead of silently letting Luna execute work selected for Terra/GPT-5.6
 - adds `$usage-guard status` / `$usage-guard usage` behavior with local before/current/after telemetry
 - reads Codex's local state database and rollout token-count events read-only; it never reads or forwards auth tokens
 - records total, input, cached-input, output, and reasoning-token deltas when the same Codex thread can be matched
@@ -57,7 +61,7 @@ The default launcher routes are:
 
 Astra is deliberately not selected automatically. The goal is usage conservation, not maximum reasoning on every task.
 
-The recommended `cguard` path applies the selected model at Codex launch time. Direct `$usage-guard` Skill invocation inside an already-running Codex session can still recommend a route, but it cannot reliably replace the parent session model.
+The parent Codex TUI model may remain unchanged because a Skill cannot reliably replace that already-created parent thread. v0.5 handles this by treating the parent as a coordinator: when its model/reasoning differs from the selected route, Usage Guard runs one pinned Codex execution worker and verifies that worker's actual model/reasoning from local thread metadata. `cguard` remains available when you want the parent session itself to start on the selected route.
 
 ## Install on Windows
 
@@ -89,16 +93,35 @@ After the one-time install, open Codex normally in your project and use:
 
     $usage-guard build a small CRM and verify it
 
-Usage Guard detects the repository, creates the local budget/state, captures a usage baseline, selects the route, loads only relevant craft references, and controls the verification loop.
+Usage Guard detects the repository, creates the local budget/state, captures a usage baseline, selects the route, then immediately enforces it. If the current Codex thread already matches the selected model and reasoning, it works in-place. If not, it launches one pinned `codex exec` worker using the selected route and verifies the worker's actual model/reasoning before accepting the execution.
 
 At any time inside Codex:
 
     $usage-guard status
     $usage-guard usage
 
-The status view includes the selected route, remaining action/model/retry budget, detected verification commands, relevant craft references, and before/current usage deltas.
+The status view includes the selected route, coordinator model/reasoning, verified effective execution model/reasoning, route-enforcement status, dedicated worker token usage when applicable, remaining action/model/retry budget, detected verification commands, relevant craft references, and before/current usage deltas.
+
+A coordinator status line can therefore still show Luna while the actual task runs on a verified Terra/GPT-5.6 pinned worker. `$usage-guard status` is the source of truth for requested versus actual execution route.
 
 When the task finishes, Usage Guard reports the measured token delta when available. If the task started in a new pre-session launcher and no same-thread baseline exists, it can fall back to an approximate global token delta; concurrent Codex sessions can make that fallback noisy.
+
+### Route enforcement
+
+For every new guarded task, the Skill runs:
+
+    guard.cmd enforce --task-id <ID>
+
+Possible outcomes:
+
+- `parent-match`: coordinator model **and** reasoning already match the selected route; no nested worker is needed.
+- `verified`: a pinned worker ran and its observed model/reasoning match the requested route.
+- `model-mismatch`, `reasoning-mismatch`, `unverified`, `unverified-no-thread`, or `failed`: route enforcement failed. Usage Guard does not silently continue model-heavy work on the coordinator.
+- `budget-blocked`: the model-turn/action budget prevents another worker.
+
+The pinned worker uses the existing Codex/ChatGPT sign-in, `workspace-write` sandboxing, and non-interactive `approval_policy="never"` inside that sandbox. It never uses Codex's dangerous approval/sandbox bypass flag.
+
+The worker is dedicated to one guarded task, so its local thread token total is also a useful per-task token measurement.
 
 ### Optional: pre-session parent-model routing
 
@@ -142,14 +165,26 @@ Browser Use Cloud is optional. Usage Guard only considers it when the user has o
          +--> browser verification only when relevant
          |
          v
-    persistent task state
+    compare current coordinator vs selected route
+         |
+         +--> exact match --> continue in parent
+         |
+         +--> mismatch --> one pinned codex exec worker
+                          |
+                          +--> --model <selected>
+                          +--> model_reasoning_effort=<selected>
+                          +--> verify observed model/reasoning from local thread state
+                          +--> fail closed on mismatch/unverified route
+         |
+         v
+    persistent task state + requested/actual execution route
          |
          +--> HOT: exact current evidence
          +--> WARM: compact completed/recent state
          +--> COLD: full local event history + hashes
          |
          v
-    Codex worker
+    verified execution thread
          |
          v
     indexed local action space
@@ -178,9 +213,13 @@ Read current Codex usage telemetry without a model call:
 
     & "$HOME\.codex-usage-guard\guard.cmd" usage --repo .
 
-Show the active task's route, budget, verification and usage delta:
+Show the active task's requested route, coordinator route, effective execution route, budget, verification and usage delta:
 
     & "$HOME\.codex-usage-guard\guard.cmd" status --repo .
+
+Enforce the selected route for an active task:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" enforce --task-id <ID>
 
 Inspect a repository without a model call:
 
@@ -297,7 +336,7 @@ Usage Guard reads only local Codex telemetry:
 
 It never reads `~/.codex/auth.json` and never forwards Codex credentials.
 
-A same-thread token delta is the strongest measurement. A global-token fallback is marked approximate because another concurrent Codex session can contribute to it. The 5-hour/weekly percentage meters are coarse account counters and should not be presented as exact task cost.
+A same-thread token delta is the strongest measurement. When v0.5 uses a dedicated pinned worker, that worker thread is created for one guarded task, so its thread token total provides a particularly useful task-level measurement. A global-token fallback is marked approximate because another concurrent Codex session can contribute to it. The 5-hour/weekly percentage meters are coarse account counters and should not be presented as exact task cost.
 
 ## Task-specific craft references
 

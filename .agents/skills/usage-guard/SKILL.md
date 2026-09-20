@@ -1,6 +1,6 @@
 ---
 name: usage-guard
-description: Reduce Codex usage on coding tasks with local routing, usage snapshots, bounded model turns, progressive craft references, compressed evidence, and the cheapest valid next action.
+description: Reduce Codex usage on coding tasks with enforced model routing, local usage snapshots, bounded model turns, progressive craft references, compressed evidence, and the cheapest valid next action.
 ---
 
 # Codex Usage Guard
@@ -18,7 +18,7 @@ Interpret these without starting a new task:
 
 Keep the user-facing result compact. Never expose auth tokens, cookies, hidden session credentials, or raw rollout contents.
 
-## Start a guarded task
+## Start and enforce a guarded task
 
 If `CODEX_USAGE_GUARD_TASK_ID` is present, the pre-session launcher already created the task. Reuse that ID and do not call `start` again.
 
@@ -28,11 +28,42 @@ Otherwise on Windows:
 
 Keep the returned `task_id`. The plan includes model/reasoning policy, budgets, verification commands, local usage baseline, and zero-to-two task-specific reference files.
 
+Immediately enforce the route:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" enforce --task-id <ID>
+
+Interpret the enforcement result strictly:
+
+- `parent-match`: the current Codex thread already matches both selected model and reasoning. Continue in this thread.
+- `verified`: a single pinned `codex exec` worker ran the objective using the selected model/reasoning and Codex local thread telemetry verified both. Do not re-implement the task in the coordinator. Continue only with justified deterministic verification, diff review, or unresolved follow-up.
+- `failed`, `model-mismatch`, `reasoning-mismatch`, `unverified`, or `unverified-no-thread`: do not silently continue model-heavy implementation on the coordinator. Report the routing failure with the requested and observed route. Deterministic inspection is allowed.
+- `budget-blocked`: do not bypass the guard.
+
+The coordinator status line may still show its original model when a pinned worker was used. That is expected. `$usage-guard status` is the source of truth for requested model, coordinator model, verified execution model, and route status.
+
+Never claim the selected model was used unless enforcement is `parent-match` or `verified`.
+
 Read only the reference files listed in `plan.skill_refs`. Do not load every craft guide.
 
-Inside an already-running Codex session, the parent status-line model may not change. When the selected custom agent profile is available and its model differs from the parent, delegate the implementation to that one selected worker. Do not fan out. The parent remains coordinator only. If exact parent-session model switching is required, the optional `cguard` launcher remains available.
+## Pinned worker safety
+
+The pinned worker:
+
+- uses the existing Codex/ChatGPT sign-in
+- runs one `codex exec` thread only
+- pins `--model` and `model_reasoning_effort`
+- uses `workspace-write` sandboxing
+- uses non-interactive `approval_policy="never"` inside that sandbox
+- never uses the dangerous sandbox/approval bypass flag
+- does not spawn subagents
+- preserves unrelated user changes
+- records its worker thread id, observed model/reasoning, final message, and worker token usage
+
+If the requested model is unavailable, fail closed. Do not silently substitute Luna or another model.
 
 ## Work loop
+
+When the parent thread is the verified execution thread, or after a verified pinned worker has finished, prefer deterministic evidence before any additional model work.
 
 Before another model-heavy action:
 
@@ -65,13 +96,15 @@ Verify explicit requirements and the final diff, then:
 
     & "$HOME\.codex-usage-guard\guard.cmd" finish --task-id <ID> --status completed
 
-The finish response includes the local before/after usage snapshot when Codex exposes it. Report:
+Report:
 
 - what changed
 - what was verified
-- selected route
-- task token delta when measured on the same thread
-- 5-hour/weekly usage percentage delta when available
+- requested route
+- route-enforcement status
+- actual execution model/reasoning when verified
+- dedicated worker token usage when a pinned worker was used
+- same-thread or account-meter deltas when available
 - unresolved risks
 
 Token counts are local Codex telemetry. Rate-limit percentage deltas are coarse account meters and are not the same thing as exact task cost. Never claim an exact percentage of allowance saved without a controlled baseline comparison.

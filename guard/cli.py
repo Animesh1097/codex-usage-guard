@@ -14,6 +14,7 @@ from .budget import budget_status
 from .classifier import classify_task
 from .compressor import compress, estimate_tokens
 from .context import make_capsule
+from .executor import enforce_task, enforcement_status
 from .launcher import prepare_launch, preview_launch, resolve_launch_input, run_codex
 from .next_action import predict_next_action
 from .repo import inspect_repo
@@ -120,6 +121,20 @@ def cmd_status(args: argparse.Namespace) -> int:
         thread_id=os.environ.get("CODEX_THREAD_ID") or baseline.get("thread_id"),
         repo_root=state.get("repo_root"),
     )
+    enforcement = enforcement_status(state)
+    worker_usage = enforcement.get("worker_usage") if isinstance(enforcement, dict) else None
+    compact_enforcement = {
+        "status": enforcement.get("status"),
+        "requested_model": enforcement.get("requested_model"),
+        "requested_reasoning": enforcement.get("requested_reasoning"),
+        "coordinator_model": enforcement.get("coordinator_model"),
+        "coordinator_reasoning": enforcement.get("coordinator_reasoning"),
+        "effective_model": enforcement.get("effective_model"),
+        "effective_reasoning": enforcement.get("effective_reasoning"),
+        "worker_thread_id": enforcement.get("worker_thread_id"),
+        "worker_tokens_total": worker_usage.get("tokens_total") if isinstance(worker_usage, dict) else None,
+        "worker_token_breakdown": worker_usage.get("token_breakdown") if isinstance(worker_usage, dict) else None,
+    }
     _json(
         {
             "task_id": task_id,
@@ -131,6 +146,7 @@ def cmd_status(args: argparse.Namespace) -> int:
                 "model": state.get("plan", {}).get("preferred_model"),
                 "reasoning_effort": state.get("plan", {}).get("reasoning_effort"),
             },
+            "route_enforcement": compact_enforcement,
             "budget": budget_status(state),
             "usage": {
                 "before": baseline,
@@ -155,6 +171,16 @@ def cmd_usage(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_enforce(args: argparse.Namespace) -> int:
+    result = enforce_task(
+        args.task_id,
+        force_worker=args.force_worker,
+        timeout_seconds=args.timeout,
+    )
+    _json(result)
+    return 0 if result.get("status") in {"parent-match", "verified"} else 3
+
+
 def cmd_finish(args: argparse.Namespace) -> int:
     state = finish_task(args.task_id, status=args.status)
     record_task_summary(
@@ -169,6 +195,7 @@ def cmd_finish(args: argparse.Namespace) -> int:
             "budget": budget_status(state),
             "compression": aggregate(task_id=args.task_id),
             "usage": state.get("usage"),
+            "route_enforcement": enforcement_status(state),
         }
     )
     return 0
@@ -377,6 +404,12 @@ def build_parser() -> argparse.ArgumentParser:
     usage = sub.add_parser("usage", help="read current Codex token/rate-limit telemetry locally")
     usage.add_argument("--repo", default=".")
     usage.set_defaults(func=cmd_usage)
+
+    enforce = sub.add_parser("enforce", help="enforce the selected model/reasoning with a pinned Codex exec worker when needed")
+    enforce.add_argument("--task-id", required=True)
+    enforce.add_argument("--force-worker", action="store_true")
+    enforce.add_argument("--timeout", type=int, default=1800)
+    enforce.set_defaults(func=cmd_enforce)
 
     fn = sub.add_parser("finish", help="close a guarded task and write summary telemetry")
     fn.add_argument("--task-id", required=True)

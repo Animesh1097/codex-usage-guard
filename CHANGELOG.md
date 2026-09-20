@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0
+
+- enforce the selected model and reasoning from inside an already-open Codex session
+- add a single pinned `codex exec` worker when the coordinator model/reasoning does not match the route
+- verify the worker's actual model and reasoning from Codex local thread metadata
+- fail closed on model mismatch, reasoning mismatch, unavailable/unverifiable worker routes, or exhausted model budget
+- never silently continue model-heavy work on Luna when Terra/GPT-5.6 was selected
+- keep the parent Codex thread as a lightweight coordinator when a pinned worker executes the task
+- record dedicated worker thread id, observed route, final message, and worker token usage
+- use workspace-write sandboxing and never use the dangerous approval/sandbox bypass flag
+- pass only the task-selected UI/UX/system/browser craft references to the worker
+- show requested, coordinator, and effective execution models separately in `$usage-guard status`
+- retain `cguard` for users who want the parent session itself started on the selected route
+
+
 ## 0.4.0
 
 - make the in-Codex `$usage-guard` Skill the normal post-install workflow

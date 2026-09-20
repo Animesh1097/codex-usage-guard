@@ -13,11 +13,11 @@ class UsageTests(unittest.TestCase):
         home = Path(td.name)
         db = sqlite3.connect(home / "state_5.sqlite")
         db.execute(
-            "CREATE TABLE threads (id TEXT PRIMARY KEY, model TEXT, tokens_used INTEGER, cwd TEXT, updated_at INTEGER)"
+            "CREATE TABLE threads (id TEXT PRIMARY KEY, model TEXT, reasoning_effort TEXT, tokens_used INTEGER, cwd TEXT, updated_at INTEGER)"
         )
         db.execute(
-            "INSERT INTO threads VALUES (?, ?, ?, ?, ?)",
-            ("thread-1", "gpt-test", 1000, "/repo", 10),
+            "INSERT INTO threads VALUES (?, ?, ?, ?, ?, ?)",
+            ("thread-1", "gpt-test", "medium", 1000, "/repo", 10),
         )
         db.commit()
         db.close()
@@ -54,6 +54,7 @@ class UsageTests(unittest.TestCase):
             self.assertTrue(snap["available"])
             self.assertEqual(snap["tokens_total"], 1000)
             self.assertEqual(snap["model"], "gpt-test")
+            self.assertEqual(snap["reasoning_effort"], "medium")
             self.assertEqual(snap["rate_limits"]["primary"]["used_percent"], 20.0)
             self.assertEqual(snap["rate_limits"]["secondary"]["window_minutes"], 10080)
             self.assertEqual(snap["token_breakdown"]["cached_input_tokens"], 400)
