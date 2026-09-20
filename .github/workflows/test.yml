@@ -47,3 +47,24 @@ jobs:
               exit 1
             }
           }
+
+
+  rust-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test Rust core
+        run: cargo test -p usage-guard-core
+
+  visualizer-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Validate Tauri config JSON
+        shell: pwsh
+        run: |
+          Get-Content apps/visualizer/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json | Out-Null
+      - name: Check Tauri visual companion
+        run: cargo check --manifest-path apps/visualizer/src-tauri/Cargo.toml
