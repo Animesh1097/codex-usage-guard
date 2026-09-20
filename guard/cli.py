@@ -14,6 +14,7 @@ from .budget import budget_status
 from .classifier import classify_task
 from .compressor import compress, estimate_tokens
 from .context import make_capsule
+from .executor import enforce_task, enforcement_status
 from .launcher import prepare_launch, preview_launch, resolve_launch_input, run_codex
 from .next_action import predict_next_action
 from .repo import inspect_repo
@@ -131,6 +132,7 @@ def cmd_status(args: argparse.Namespace) -> int:
                 "model": state.get("plan", {}).get("preferred_model"),
                 "reasoning_effort": state.get("plan", {}).get("reasoning_effort"),
             },
+            "route_enforcement": enforcement_status(state),
             "budget": budget_status(state),
             "usage": {
                 "before": baseline,
@@ -153,6 +155,16 @@ def cmd_usage(args: argparse.Namespace) -> int:
     profile = inspect_repo(args.repo)
     _json(usage_snapshot(repo_root=profile.root))
     return 0
+
+
+def cmd_enforce(args: argparse.Namespace) -> int:
+    result = enforce_task(
+        args.task_id,
+        force_worker=args.force_worker,
+        timeout_seconds=args.timeout,
+    )
+    _json(result)
+    return 0 if result.get("status") in {"parent-match", "verified"} else 3
 
 
 def cmd_finish(args: argparse.Namespace) -> int:
@@ -377,6 +389,12 @@ def build_parser() -> argparse.ArgumentParser:
     usage = sub.add_parser("usage", help="read current Codex token/rate-limit telemetry locally")
     usage.add_argument("--repo", default=".")
     usage.set_defaults(func=cmd_usage)
+
+    enforce = sub.add_parser("enforce", help="enforce the selected model/reasoning with a pinned Codex exec worker when needed")
+    enforce.add_argument("--task-id", required=True)
+    enforce.add_argument("--force-worker", action="store_true")
+    enforce.add_argument("--timeout", type=int, default=1800)
+    enforce.set_defaults(func=cmd_enforce)
 
     fn = sub.add_parser("finish", help="close a guarded task and write summary telemetry")
     fn.add_argument("--task-id", required=True)
