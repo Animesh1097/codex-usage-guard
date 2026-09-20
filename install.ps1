@@ -92,7 +92,7 @@ Write-Host ""
 Write-Host "Codex Usage Guard $Version installed." -ForegroundColor Green
 Write-Host "Recommended after this one-time install: work inside Codex."
 Write-Host "  `$usage-guard <task>  # auto-enforces selected model/reasoning when needed"
-Write-Host "  `$usage-guard status"
+Write-Host "  `$usage-guard status  # compact visual HUD"
 Write-Host "  `$usage-guard usage"
 Write-Host "If the open Codex model differs, Usage Guard runs one verified pinned Codex worker automatically."
 Write-Host "Optional parent-model pre-routing remains available with cguard."
