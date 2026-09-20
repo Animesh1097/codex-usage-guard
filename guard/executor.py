@@ -77,7 +77,9 @@ def _worker_prompt(state: dict[str, Any]) -> str:
         "typecheck": repo.get("typecheck_command"),
     }
     refs = plan.get("skill_refs") or []
-    refs_text = ", ".join(str(item) for item in refs) if refs else "none"
+    skill_root = Path(__file__).resolve().parents[1] / ".agents" / "skills" / "usage-guard"
+    ref_paths = [str(skill_root / str(item).removeprefix("references/")) for item in refs]
+    refs_text = ", ".join(ref_paths) if ref_paths else "none"
     return (
         "You are the single pinned execution worker for Codex Usage Guard. "
         "Do not invoke $usage-guard, do not spawn subagents, and do not change the requested model. "
@@ -86,8 +88,8 @@ def _worker_prompt(state: dict[str, Any]) -> str:
         f"Objective: {state.get('objective', '')}\n"
         f"Task kind: {plan.get('task_kind', 'general')}. "
         f"Context budget target: {plan.get('context_budget_tokens', 'unknown')} tokens. "
-        f"Relevant craft references selected by the guard: {refs_text}. "
-        "Apply their principles when relevant without loading unrelated guides. "
+        f"Relevant craft reference files selected by the guard: {refs_text}. "
+        "Read only those reference files when they exist, then apply their principles. Do not load unrelated guides. "
         f"Detected verification commands: {json.dumps(verification, ensure_ascii=False)}. "
         "Do not invent verification commands. "
         "Make the smallest complete change, run only justified deterministic checks, review the final diff, "
