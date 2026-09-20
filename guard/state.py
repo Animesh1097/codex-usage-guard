@@ -8,6 +8,7 @@ from typing import Any
 
 from .budget import assert_action_allowed, budget_status
 from .repo import RepoProfile, changed_file_hashes
+from .usage import usage_delta, usage_snapshot
 
 
 DATA_ROOT = Path.home() / ".codex-usage-guard-data"
@@ -24,8 +25,9 @@ def _task_path(task_id: str, root: Path = TASKS_ROOT) -> Path:
 
 def start_task(task: str, plan: dict[str, Any], repo: RepoProfile, *, root: Path = TASKS_ROOT) -> dict[str, Any]:
     task_id = uuid.uuid4().hex[:12]
+    baseline_usage = usage_snapshot(repo_root=repo.root)
     state = {
-        "version": 2,
+        "version": 3,
         "task_id": task_id,
         "objective": task,
         "repo_root": repo.root,
@@ -39,6 +41,11 @@ def start_task(task: str, plan: dict[str, Any], repo: RepoProfile, *, root: Path
         "events": [],
         "completed": [],
         "unresolved": [],
+        "usage": {
+            "baseline": baseline_usage,
+            "finish": None,
+            "delta": None,
+        },
     }
     path = _task_path(task_id, root)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -104,5 +111,12 @@ def record_action(
 def finish_task(task_id: str, *, status: str = "completed", root: Path = TASKS_ROOT) -> dict[str, Any]:
     state = load_task(task_id, root=root)
     state["status"] = status
+    current = usage_snapshot(
+        thread_id=(state.get("usage") or {}).get("baseline", {}).get("thread_id"),
+        repo_root=state.get("repo_root"),
+    )
+    usage = state.setdefault("usage", {})
+    usage["finish"] = current
+    usage["delta"] = usage_delta(usage.get("baseline"), current)
     save_task(state, root=root)
     return state
