@@ -83,7 +83,10 @@ def _safe_tk() -> tuple[Any, Any] | tuple[None, None]:
 
 
 def can_open_window() -> bool:
-    if os.name == "nt":
+    tk, _ = _safe_tk()
+    if tk is None:
+        return False
+    if os.name == "nt" or sys.platform == "darwin":
         return True
     return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
