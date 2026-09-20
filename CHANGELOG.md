@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.1
+
+- fix the Windows pixel-factory window rendering only the tiled background
+- correct the Tk Canvas line option from `jointstyle` to `joinstyle`
+- add a regression test so the invalid Canvas option cannot return
+- log visualizer render exceptions to `~/.codex-usage-guard-data/visualizer.log`
+- show a visible failure scene instead of silently leaving a blank window if future render code throws
+
+
 ## 0.8.0
 
 - replace the terminal-first live-task experience with an optional graphical pixel-art factory visualizer
