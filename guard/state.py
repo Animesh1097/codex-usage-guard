@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,7 +26,11 @@ def _task_path(task_id: str, root: Path = TASKS_ROOT) -> Path:
 
 def start_task(task: str, plan: dict[str, Any], repo: RepoProfile, *, root: Path = TASKS_ROOT) -> dict[str, Any]:
     task_id = uuid.uuid4().hex[:12]
-    baseline_usage = usage_snapshot(repo_root=repo.root)
+    active_thread = os.environ.get("CODEX_THREAD_ID")
+    baseline_usage = usage_snapshot(
+        thread_id=active_thread or "__usage_guard_pending_thread__",
+        repo_root=repo.root if active_thread else None,
+    )
     state = {
         "version": 3,
         "task_id": task_id,
