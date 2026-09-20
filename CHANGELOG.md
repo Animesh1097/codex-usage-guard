@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.9.0
+
+- keep normal `$usage-guard` work in the user's current Codex session
+- stop automatically changing models, changing reasoning effort, or spawning pinned workers
+- retain `cguard` and `enforce` only as explicit advanced opt-in routing tools
+- launch the graphical visualizer from task start instead of depending on route enforcement
+- redesign the visualizer around real workflow phases: analyze, plan, work, verify, complete/failed
+- remove model names, model colors, and routing signals from the normal visual UI
+- color the visual scene by task type instead of model family
+- redesign the terminal fallback HUD to be model-neutral
+- simplify normal status/final output around task phase, verification, budget, and measured usage
+- strengthen rendered UI/UX acceptance across representative mobile, tablet/compact, and desktop widths
+- keep the deterministic UI audit and anti-generic output quality gate
+- preserve advanced model-routing compatibility for users who explicitly request it
+
+
 ## 0.8.1
 
 - fix the Windows pixel-factory window rendering only the tiled background
