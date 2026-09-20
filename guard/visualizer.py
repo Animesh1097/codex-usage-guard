@@ -97,23 +97,46 @@ def _safe_tk() -> tuple[Any, Any] | tuple[None, None]:
         return None, None
 
 
-def can_open_window() -> bool:
-    tk, _ = _safe_tk()
-    if tk is None:
-        return False
+def desktop_available() -> bool:
     if os.name == "nt" or sys.platform == "darwin":
         return True
     return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
 
+def can_open_window() -> bool:
+    tk, _ = _safe_tk()
+    return tk is not None and desktop_available()
+
+
+def visualizer_command(task_id: str, *, install_root: Path | None = None) -> list[str] | None:
+    install_root = install_root or Path(__file__).resolve().parents[1]
+    override = os.environ.get("CODEX_USAGE_GUARD_VISUALIZER")
+    if override:
+        path = Path(override).expanduser()
+        if path.is_file():
+            return [str(path), "--task-id", task_id]
+
+    names = ["usage-guard-visualizer.exe", "usage-guard-visualizer"] if os.name == "nt" else ["usage-guard-visualizer"]
+    for name in names:
+        path = install_root / "bin" / name
+        if path.is_file():
+            return [str(path), "--task-id", task_id]
+
+    if can_open_window():
+        return [sys.executable, "-m", "guard.visualizer", "--task-id", task_id]
+    return None
+
+
 def spawn_visualizer(task_id: str, *, install_root: Path | None = None) -> bool:
     if os.environ.get("CODEX_USAGE_GUARD_DISABLE_VISUAL") == "1":
         return False
-    if not can_open_window():
+    if not desktop_available():
         return False
 
     install_root = install_root or Path(__file__).resolve().parents[1]
-    command = [sys.executable, "-m", "guard.visualizer", "--task-id", task_id]
+    command = visualizer_command(task_id, install_root=install_root)
+    if command is None:
+        return False
     kwargs: dict[str, Any] = {
         "cwd": str(install_root),
         "stdin": subprocess.DEVNULL,
