@@ -26,6 +26,18 @@ Ideas adapted: real-browser verification, structured page observations, small va
 
 Ideas adapted: progressive disclosure, narrow skill activation, UI/accessibility review checklists, design-system awareness, and separating product/visual/verification concerns. Usage Guard's reference files are original condensed guidance; Anthropic skill text is not vendored.
 
+## UI quality research
+
+- AI UX Playground skill catalog: https://aiuxplayground.com/skills/
+- Impeccable: https://github.com/pbakaus/impeccable — Apache-2.0
+- Jakub Krehel design skills: https://github.com/jakubkrehel/skills — MIT
+- Taste Skill: https://github.com/Leonxlnx/taste-skill — MIT
+- Vercel Web Interface Guidelines: https://github.com/vercel-labs/web-interface-guidelines — MIT
+
+Ideas adapted: preserve the incumbent design system, distinguish product UI from brand/marketing surfaces, shape hierarchy before decoration, audit layout/typography/color/accessibility as separate concerns, use explicit anti-generic checks, verify rendered states, improve existing projects in place, and keep deterministic source checks separate from visual judgement.
+
+Usage Guard does not vendor these skills. Its UI reference and detector rules are independently written, intentionally smaller, and loaded only for UI-relevant tasks.
+
 ## Usage telemetry research
 
 - qianhaoq/codex-usage: https://github.com/qianhaoq/codex-usage — MIT
