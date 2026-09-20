@@ -138,8 +138,12 @@ def record_action(
 def finish_task(task_id: str, *, status: str = "completed", root: Path = TASKS_ROOT) -> dict[str, Any]:
     state = load_task(task_id, root=root)
     state["status"] = status
+    baseline = (state.get("usage") or {}).get("baseline", {})
+    baseline_thread = baseline.get("thread_id")
+    if baseline_thread == "__usage_guard_pending_thread__":
+        baseline_thread = None
     current = usage_snapshot(
-        thread_id=(state.get("usage") or {}).get("baseline", {}).get("thread_id"),
+        thread_id=os.environ.get("CODEX_THREAD_ID") or baseline_thread,
         repo_root=state.get("repo_root"),
     )
     usage = state.setdefault("usage", {})
