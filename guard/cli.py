@@ -86,7 +86,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     _json(
         {
             "task_id": state["task_id"],
-            "execution_mode": "current-session",
+            "execution_mode": state.get("execution_mode", "current-session"),
             "plan": state["plan"],
             "repo": state["repo"],
             "budget": budget_status(state),
@@ -141,7 +141,7 @@ def _status_payload(state: dict[str, object], *, include_routing: bool = False) 
         "status": state.get("status"),
         "objective": state.get("objective"),
         "repo_root": state.get("repo_root"),
-        "execution_mode": "current-session",
+        "execution_mode": state.get("execution_mode", "current-session"),
         "task_kind": state.get("plan", {}).get("task_kind"),
         "strategy": state.get("plan", {}).get("strategy"),
         "budget": budget_status(state),
@@ -266,7 +266,7 @@ def cmd_finish(args: argparse.Namespace) -> int:
         {
             "task_id": args.task_id,
             "status": args.status,
-            "execution_mode": "current-session",
+            "execution_mode": state.get("execution_mode", "current-session"),
             "budget": budget_status(state),
             "compression": aggregate(task_id=args.task_id),
             "usage": state.get("usage"),
