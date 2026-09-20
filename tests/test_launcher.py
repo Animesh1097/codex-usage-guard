@@ -7,16 +7,17 @@ from guard.launcher import build_codex_command, preview_launch, resolve_launch_i
 
 class LauncherTests(unittest.TestCase):
     def test_build_command_pins_repo_model_and_reasoning(self):
+        repo_root = r"C:\Projects\demo"
         command = build_codex_command(
             task_id="abc123",
             task="fix the seller form",
-            repo_root=r"C:\\Projects\\demo",
+            repo_root=repo_root,
             model="gpt-5.6-terra",
             reasoning_effort="medium",
             codex_executable="codex",
         )
         self.assertEqual(command[:2], ["codex", "--cd"])
-        self.assertIn(r"C:\\Projects\\demo", command)
+        self.assertIn(repo_root, command)
         self.assertIn("--model", command)
         self.assertIn("gpt-5.6-terra", command)
         self.assertIn('model_reasoning_effort="medium"', command)
