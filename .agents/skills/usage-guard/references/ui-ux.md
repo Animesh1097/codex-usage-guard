@@ -23,6 +23,41 @@ Preserve a coherent existing system when one exists. Do not introduce a second s
 
 For a new or visually weak surface, write one short internal direction before coding: **who uses this, what is the primary action, and what should the interface feel like?** Use that to make choices instead of defaulting to generic SaaS patterns.
 
+For every UI task, run the deterministic `ui-brief` first. If it returns `visual_ambition: design-grade`, do not begin implementation until the visual concept is explicit.
+
+## 2. Design-grade mode
+
+When the task asks for a polished, premium, eye-catching, distinctive, memorable, fashion/editorial, high-end, beautiful, or explicitly non-generic result, the bar is **design-grade**, not merely production-correct.
+
+Before coding, define all of these in compact form:
+
+- **Visual concept** — one sentence describing the interface character.
+- **Composition rule** — the grid, asymmetry, framing, rail, split, or density principle that structures the page.
+- **Typography system** — display/section/body/label/number roles and how contrast is achieved.
+- **Color/material system** — background/surface/text/accent/semantic colors and how restraint is maintained.
+- **Density rhythm** — where the interface is intentionally compact vs spacious.
+- **Signature detail** — one product-specific visual/interaction device that makes the screen recognizable without relying on a logo.
+- **Reference archetype** — a design category such as editorial dashboard, professional workstation, luxury retail interface, operations console, or data journal. Do not copy a specific product.
+
+For design-grade work:
+
+- Do not accept the default "sidebar + four metric cards + rounded white panels" shell unless the product genuinely calls for it.
+- Do not confuse novelty with decoration. A strong grid, typography, whitespace, and state design matter more than effects.
+- The first viewport should communicate product identity within a few seconds while keeping the primary action obvious.
+- Use visual tension intentionally: scale contrast, alignment, negative space, density shifts, or editorial grouping.
+- Data-heavy product UI can still be visually memorable through table composition, typography, status language, micro-layout, and information density.
+- Avoid template-like symmetry when it removes hierarchy.
+- Avoid filling empty space with decorative cards, charts, badges, or oversized metrics.
+- One coherent visual idea executed thoroughly is better than several fashionable effects.
+
+**Rendered proof is mandatory.** A deterministic source audit can catch anti-patterns, but it cannot judge whether the result is aesthetically strong.
+
+Design-grade work requires at least **two rendered critique passes**:
+1. structural/visual critique after the first complete render;
+2. final aesthetic polish critique after corrections.
+
+If browser/screenshot evidence is unavailable, explicitly report that aesthetic quality was not visually verified. Do not treat a passing `ui-audit` as visual approval.
+
 ## 2. Shape hierarchy before decoration
 
 Design the reading and action order first.
@@ -165,9 +200,10 @@ For UI work, do not stop after implementation.
 4. **Run deterministic UI audit** on changed UI files.
 5. **Run project verification** (tests/typecheck/build when detected).
 6. **Render in a browser** when browser tooling is available.
-7. **Critique the rendered result**, not just the source code: hierarchy, alignment, spacing, wrapping, contrast, interaction states, and mobile behavior.
-8. **Polish once** based on concrete defects found.
-9. **Review the final diff** and stop.
+7. **Critique the rendered result**, not just the source code: hierarchy, composition, typography, alignment, spacing, wrapping, contrast, interaction states, product identity, and mobile behavior.
+8. **Polish based on concrete defects found.** Standard UI work requires at least one rendered critique pass; design-grade work requires two.
+9. **Re-render after polish** when the task is design-grade and verify that the second pass materially improved the composition rather than only changing details.
+10. **Review the final diff** and stop.
 
 Do not call a UI task complete merely because the code compiles or the build passes.
 
@@ -193,3 +229,23 @@ Before DONE, the rendered result should satisfy all applicable checks:
 When a representative "before" screen exists, compare against it and preserve the product's strongest existing visual conventions unless the user explicitly requested a redesign.
 
 For new UI, prefer one strong coherent direction over many decorative ideas. If the first rendered pass is structurally sound but visually generic, spend the polish pass on composition, typography, spacing, and states—not extra gradients, cards, or animation.
+
+
+## 13. Aesthetic critique rubric
+
+When looking at the rendered interface, evaluate it as a designed object rather than a checklist.
+
+Ask:
+
+- **Concept:** Is there a clear visual idea, or only competent component assembly?
+- **Composition:** Does the eye move intentionally through the screen? Are there meaningful dominant, secondary, and quiet zones?
+- **Typography:** Does type create character and hierarchy, or is everything the same generic UI voice?
+- **Rhythm:** Are density, spacing, and repetition controlled, or merely uniform?
+- **Color:** Is the accent deliberate and scarce? Do neutrals/surfaces support the concept?
+- **Control craft:** Do inputs, tables, filters, chips, dialogs, and states look like parts of one product?
+- **Identity:** If the logo were removed, would the interface still feel specific to this product?
+- **Responsiveness:** Does mobile become a deliberately recomposed interface, not a squeezed desktop?
+- **Restraint:** Can any effect/card/badge/shadow be removed without losing meaning?
+- **Finish:** Are there small inconsistencies that a visually trained reviewer would notice immediately?
+
+For design-grade tasks, do not mark the UI complete when the answer to **Concept**, **Composition**, **Typography**, or **Identity** is weak.
