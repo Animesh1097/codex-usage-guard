@@ -32,13 +32,14 @@ def start_task(task: str, plan: dict[str, Any], repo: RepoProfile, *, root: Path
         repo_root=repo.root if active_thread else None,
     )
     state = {
-        "version": 4,
+        "version": 5,
         "task_id": task_id,
         "objective": task,
         "repo_root": repo.root,
         "created_at": _now(),
         "updated_at": _now(),
         "status": "active",
+        "execution_mode": "current-session" if plan.get("preferred_model") == "current" else "advanced-routed-session",
         "plan": plan,
         "repo": repo.to_dict(),
         "file_hashes": changed_file_hashes(repo),
