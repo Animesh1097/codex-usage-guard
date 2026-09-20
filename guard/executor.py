@@ -78,7 +78,7 @@ def _worker_prompt(state: dict[str, Any]) -> str:
     }
     refs = plan.get("skill_refs") or []
     skill_root = Path(__file__).resolve().parents[1] / ".agents" / "skills" / "usage-guard"
-    ref_paths = [str(skill_root / str(item).removeprefix("references/")) for item in refs]
+    ref_paths = [str(skill_root / str(item)) for item in refs]
     refs_text = ", ".join(ref_paths) if ref_paths else "none"
     return (
         "You are the single pinned execution worker for Codex Usage Guard. "
