@@ -32,13 +32,14 @@ def start_task(task: str, plan: dict[str, Any], repo: RepoProfile, *, root: Path
         repo_root=repo.root if active_thread else None,
     )
     state = {
-        "version": 4,
+        "version": 5,
         "task_id": task_id,
         "objective": task,
         "repo_root": repo.root,
         "created_at": _now(),
         "updated_at": _now(),
         "status": "active",
+        "execution_mode": "current-session" if plan.get("preferred_model") == "current" else "advanced-routed-session",
         "plan": plan,
         "repo": repo.to_dict(),
         "file_hashes": changed_file_hashes(repo),
@@ -125,11 +126,11 @@ def _visual_phase_for_action(action: str, kind: str) -> tuple[str, str]:
     text = action.lower()
     if any(word in text for word in ("test", "build", "lint", "typecheck", "browser", "verify", "diff", "review")):
         return "verify", "verification"
-    if any(word in text for word in ("inspect", "trace", "reproduce", "search", "read")) and kind != "model":
+    if any(word in text for word in ("inspect", "trace", "reproduce", "search", "read")):
         return "analyze", "inspection"
-    if any(word in text for word in ("route", "model", "worker")) and "pinned execution worker" not in text:
-        return "route", "routing"
-    return "execute", "work"
+    if any(word in text for word in ("plan", "map", "design", "shape", "outline", "scope")):
+        return "plan", "planning"
+    return "work", "work"
 
 
 def record_action(

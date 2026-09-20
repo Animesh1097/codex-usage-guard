@@ -37,3 +37,28 @@ After every action, re-observe only the state needed for the next decision. Avoi
 - Do not send credentials, cookies, session tokens, or hidden auth material into prompts or telemetry.
 
 Browser Use Cloud is optional infrastructure, not a dependency of the core guard.
+
+
+## Visual verification matrix
+
+For UI tasks where appearance is part of the requirement, verify the changed flow at representative widths rather than only one browser size:
+
+- narrow mobile: approximately 360-390 px
+- tablet / compact desktop: approximately 768-1024 px when relevant
+- desktop: approximately 1280-1440 px
+
+Do not mechanically screenshot every page. Verify only the changed flow and the states that could realistically break.
+
+For each relevant viewport, look for:
+- horizontal overflow
+- clipped or overlapping text
+- broken sticky/fixed elements
+- menus/popovers leaving the viewport
+- awkward line wrapping
+- inconsistent spacing/alignment
+- weak visual hierarchy
+- missing loading/empty/error/validation states
+- inaccessible focus behavior
+- controls that become too small or ambiguous
+
+If screenshots are available, use them for geometry and visual judgement. Use DOM/accessibility state for semantics and interaction correctness. Neither one alone proves the full UI is correct.

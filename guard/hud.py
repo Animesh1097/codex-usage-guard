@@ -2,29 +2,13 @@ from __future__ import annotations
 
 import sys
 import threading
-import time
 from dataclasses import dataclass
-from typing import Any, Callable, TextIO
+from typing import Any, TextIO
 
 
 SPINNER = ("◐", "◓", "◑", "◒")
-STAGES = ("analyze", "judge", "route", "execute", "verify")
-STAGE_SYMBOLS = {
-    "analyze": "◆",
-    "judge": "◇",
-    "route": "↗",
-    "execute": "⚙",
-    "verify": "✓",
-}
-
-
-def _short_model(model: object) -> str:
-    text = str(model or "?")
-    return (
-        text.replace("gpt-5.6-", "")
-        .replace("gpt-5.6", "5.6")
-        .replace("gpt-", "")
-    )
+STAGES = ("analyze", "plan", "work", "verify")
+ALIASES = {"judge": "plan", "route": "plan", "execute": "work"}
 
 
 def _bar(used: int, limit: int, width: int = 8) -> str:
@@ -35,33 +19,26 @@ def _bar(used: int, limit: int, width: int = 8) -> str:
     return "█" * filled + "░" * (width - filled)
 
 
-def _stage_line(active: str, done: set[str], skipped: set[str], frame: int) -> str:
+def _stage_line(active: str, frame: int) -> str:
+    active = ALIASES.get(active, active)
+    if active not in STAGES:
+        active = "analyze"
+    idx = STAGES.index(active)
     parts: list[str] = []
-    for stage in STAGES:
-        if stage in skipped:
-            symbol = "·"
-        elif stage in done:
-            symbol = "●"
-        elif stage == active:
-            symbol = SPINNER[frame % len(SPINNER)]
+    for i, _ in enumerate(STAGES):
+        if i < idx:
+            parts.append("●")
+        elif i == idx:
+            parts.append(SPINNER[frame % len(SPINNER)])
         else:
-            symbol = "○"
-        parts.append(symbol)
+            parts.append("○")
     return "━━".join(parts)
 
 
 def _status_symbol(status: str | None) -> str:
-    if status in {"verified", "parent-match", "completed"}:
+    if status in {"completed", "verified", "parent-match"}:
         return "✓"
-    if status in {
-        "failed",
-        "model-mismatch",
-        "reasoning-mismatch",
-        "unverified",
-        "unverified-no-thread",
-        "budget-blocked",
-        "blocked",
-    }:
+    if status in {"failed", "blocked", "abandoned", "budget-blocked"}:
         return "×"
     return "◌"
 
@@ -81,26 +58,15 @@ def render_hud(
     status: str | None = None,
     judge_used: bool = False,
 ) -> str:
-    phase = phase if phase in STAGES else "analyze"
-    idx = STAGES.index(phase)
-    done = set(STAGES[:idx])
-    skipped: set[str] = set()
-    if not judge_used:
-        skipped.add("judge")
-
-    flow = _stage_line(phase, done, skipped, frame)
-    left = _short_model(coordinator_model)
-    right = _short_model(requested_model)
-    arrow = "──►" if left != right else "──"
-    reason = (reasoning or "?").lower()
+    del coordinator_model, requested_model, reasoning, judge_used
     token_text = f"{tokens:,}" if isinstance(tokens, int) else "—"
-
+    flow = _stage_line(phase, frame)
     lines = [
         "╭──────────────────────────────╮",
         f"│  {flow:<27}│",
-        f"│  {left:<8} {arrow} {right:<8} {reason[:1].upper():>2} │",
-        f"│  {_bar(action_used, action_limit)} {action_used:>2}/{action_limit:<2}  ◇ {_bar(model_turns_used, model_turns_limit, 5)} │",
-        f"│  ◒ {token_text:<10}            {_status_symbol(status):>2} │",
+        f"│  actions {_bar(action_used, action_limit)} {action_used:>2}/{action_limit:<2}      │",
+        f"│  turns   {_bar(model_turns_used, model_turns_limit)} {model_turns_used:>2}/{model_turns_limit:<2}      │",
+        f"│  tokens  {token_text:<12}       {_status_symbol(status):>2} │",
         "╰──────────────────────────────╯",
     ]
     return "\n".join(lines)
@@ -142,16 +108,12 @@ class AnimatedHUD:
         text = render_hud(
             phase=self.state.phase,
             frame=frame,
-            coordinator_model=self.state.coordinator_model,
-            requested_model=self.state.requested_model,
-            reasoning=self.state.reasoning,
             action_used=self.state.action_used,
             action_limit=self.state.action_limit,
             model_turns_used=self.state.model_turns_used,
             model_turns_limit=self.state.model_turns_limit,
             tokens=self.state.tokens,
             status=self.state.status,
-            judge_used=self.state.judge_used,
         )
         if frame:
             self.stream.write(f"\x1b[{self._lines}A")
@@ -190,29 +152,28 @@ class AnimatedHUD:
         self._draw(1)
 
 
-def visual_snapshot(state: dict[str, Any], *, phase: str = "verify") -> str:
+def visual_snapshot(state: dict[str, Any], *, phase: str | None = None) -> str:
     plan = state.get("plan", {})
     counters = state.get("counters", {})
-    execution = state.get("execution") or {}
-    limits = {
-        "actions": int(plan.get("max_actions", 0)),
-        "model_turns": int(plan.get("max_model_turns", 0)),
-    }
-    worker_usage = execution.get("worker_usage") or {}
-    tokens = worker_usage.get("tokens_total")
-    coordinator = execution.get("coordinator_model")
-    requested = execution.get("requested_model") or plan.get("preferred_model")
-    reasoning = execution.get("effective_reasoning") or execution.get("requested_reasoning") or plan.get("reasoning_effort")
+    visual = state.get("visual") or {}
+    usage = state.get("usage") or {}
+    finish = usage.get("finish") or {}
+    delta = usage.get("delta") or {}
+    token_value = delta.get("tokens_delta")
+    if not isinstance(token_value, int):
+        token_value = finish.get("tokens_total")
+    if not isinstance(token_value, int):
+        token_value = None
+
+    current_phase = phase or str(visual.get("phase") or "analyze")
+    current_phase = ALIASES.get(current_phase, current_phase)
+
     return render_hud(
-        phase=phase,
-        coordinator_model=coordinator,
-        requested_model=requested,
-        reasoning=reasoning,
+        phase=current_phase,
         action_used=int(counters.get("actions", 0)),
-        action_limit=limits["actions"],
+        action_limit=int(plan.get("max_actions", 0)),
         model_turns_used=int(counters.get("model_turns", 0)),
-        model_turns_limit=limits["model_turns"],
-        tokens=tokens if isinstance(tokens, int) else None,
-        status=execution.get("status") or state.get("status"),
-        judge_used=bool(state.get("judgement")),
+        model_turns_limit=int(plan.get("max_model_turns", 0)),
+        tokens=token_value,
+        status=str(state.get("status") or "active"),
     )

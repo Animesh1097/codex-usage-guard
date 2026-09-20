@@ -50,7 +50,7 @@ def resolve_launch_input(items: Sequence[str], repo: str | Path = ".") -> tuple[
 
 def preview_launch(task: str, repo: str | Path = ".") -> dict[str, Any]:
     profile = inspect_repo(repo)
-    plan = classify_task(task, profile.root)
+    plan = classify_task(task, profile.root, route_models=True)
     return {
         "task": task,
         "repo_root": profile.root,
@@ -103,7 +103,7 @@ def build_codex_command(
 
 def prepare_launch(task: str, repo: str | Path = ".") -> LaunchSpec:
     profile = inspect_repo(repo)
-    plan = classify_task(task, profile.root)
+    plan = classify_task(task, profile.root, route_models=True)
     state = start_task(task, plan.to_dict(), profile)
     executable = shutil.which("codex") or "codex"
     command = build_codex_command(

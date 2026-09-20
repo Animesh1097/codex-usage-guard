@@ -120,7 +120,12 @@ def _steps_for(kind: str, profile: RepoProfile, complexity: int, risk: int) -> t
     return tuple(dict.fromkeys(base))
 
 
-def classify_task(task: str, repo_path: str | Path = ".") -> GuardPlan:
+def classify_task(
+    task: str,
+    repo_path: str | Path = ".",
+    *,
+    route_models: bool = False,
+) -> GuardPlan:
     profile = inspect_repo(repo_path)
     text = " ".join(task.lower().split())
     complexity = 1
@@ -173,40 +178,50 @@ def classify_task(task: str, repo_path: str | Path = ".") -> GuardPlan:
 
     if complexity <= 2 and risk <= 3:
         strategy = "single_turn"
-        agent = "guard_fast"
-        model = "gpt-5.6-luna"
-        reasoning = "low"
+        routed_agent = "guard_fast"
+        routed_model = "gpt-5.6-luna"
+        routed_reasoning = "low"
         context_budget = 8_000
         max_turns = 2
         max_retries = 1
         max_actions = 6
     elif complexity <= 5 and risk <= 5:
         strategy = "single_agent"
-        agent = "guard_worker"
-        model = "gpt-5.6-terra"
-        reasoning = "medium"
+        routed_agent = "guard_worker"
+        routed_model = "gpt-5.6-terra"
+        routed_reasoning = "medium"
         context_budget = 14_000
         max_turns = 4
         max_retries = 2
         max_actions = 10
     elif complexity <= 7 and risk <= 7:
         strategy = "bounded_agent_loop"
-        agent = "guard_worker"
-        model = "gpt-5.6-terra"
-        reasoning = "high"
+        routed_agent = "guard_worker"
+        routed_model = "gpt-5.6-terra"
+        routed_reasoning = "high"
         context_budget = 20_000
         max_turns = 5
         max_retries = 2
         max_actions = 14
     else:
         strategy = "plan_execute_verify"
-        agent = "guard_reasoner"
-        model = "gpt-5.6"
-        reasoning = "high"
+        routed_agent = "guard_reasoner"
+        routed_model = "gpt-5.6"
+        routed_reasoning = "high"
         context_budget = 28_000
         max_turns = 6
         max_retries = 2
         max_actions = 16
+
+    if route_models:
+        agent = routed_agent
+        model = routed_model
+        reasoning = routed_reasoning
+    else:
+        agent = "current_session"
+        model = "current"
+        reasoning = "current"
+        reasons.append("current Codex session preserved; model routing is opt-in")
 
     requires_tests = bool(profile.test_command and not profile.docs_only)
     requires_build = bool(

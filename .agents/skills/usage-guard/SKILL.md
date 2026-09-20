@@ -1,130 +1,148 @@
 ---
 name: usage-guard
-description: Reduce Codex usage on coding tasks with enforced model routing, local usage snapshots, bounded model turns, progressive craft references, compressed evidence, and the cheapest valid next action.
+description: Reduce Codex usage on coding tasks with current-session execution, local usage snapshots, bounded turns, progressive craft references, compressed evidence, deterministic UI quality checks, and the cheapest valid next action.
 ---
 
 # Codex Usage Guard
 
-The user should be able to stay inside Codex after the one-time install. Treat the user's objective as the source of truth. Do not ask them to choose a model, reasoning level, agent mode, verification command, or next step when the guard can decide.
+The default workflow stays in the user's current Codex session. Do **not** change models, change reasoning effort, spawn a pinned worker, or launch a new Codex session unless the user explicitly asks for model routing.
+
+The guard's job is to improve task quality and efficiency through repository-aware planning, context control, deterministic checks, task-specific craft guidance, usage measurement, and stop conditions.
 
 ## In-Codex commands
 
 Interpret these without starting a new task:
 
-- `$usage-guard status` -> run `guard.cmd status --repo .` and show the compact visual HUD by default
+- `$usage-guard status` -> run `guard.cmd status --repo .`
 - `$usage-guard usage` -> run `guard.cmd usage --repo .`
-- `$usage-guard budget` -> resolve the active task for this repo, then show its status/budget
-- `$usage-guard stop` -> finish the active task as blocked or abandoned according to the user's intent
+- `$usage-guard budget` -> resolve the active task for this repo and show its budget
+- `$usage-guard stop` -> finish the active task as blocked or abandoned according to user intent
 
-Keep the user-facing result compact. Never expose auth tokens, cookies, hidden session credentials, or raw rollout contents.
+Do not surface model-routing information in normal status output.
 
-## Start and enforce a guarded task
+## Start a guarded task
 
-If `CODEX_USAGE_GUARD_TASK_ID` is present, the pre-session launcher already created the task. Reuse that ID and do not call `start` again.
+If `CODEX_USAGE_GUARD_TASK_ID` is present, reuse that task ID and do not create a duplicate.
 
 Otherwise on Windows:
 
     & "$HOME\.codex-usage-guard\guard.cmd" start --task "<USER_OBJECTIVE>" --repo .
 
-Keep the returned `task_id`. The plan includes model/reasoning policy, budgets, verification commands, local usage baseline, and zero-to-two task-specific reference files.
+The start command now:
+- keeps execution in the current Codex session
+- detects the repository and verification commands
+- creates action / turn / retry budgets
+- captures a local usage baseline
+- chooses zero-to-two task-specific craft references
+- launches the graphical task visualizer when a desktop GUI is available
 
-Immediately enforce the route:
+Do **not** run `enforce` in the normal workflow.
 
-    & "$HOME\.codex-usage-guard\guard.cmd" enforce --task-id <ID>
-
-On a supported desktop this automatically launches the small pixel-art factory visualizer and keeps it alive while guarded work continues. Do not print a prose progress log merely to explain what the animation is showing. When a graphical window cannot be opened, the compact terminal HUD remains the fallback.
-
-After enforcement, read the machine result without replacing the user-facing HUD:
-
-    & "$HOME\.codex-usage-guard\guard.cmd" status --task-id <ID> --json
-
-Interpret the enforcement/status result strictly:
-
-- `parent-match`: the current Codex thread already matches both selected model and reasoning. Continue in this thread.
-- `verified`: a single pinned `codex exec` worker ran the objective using the selected model/reasoning and Codex local thread telemetry verified both. Do not re-implement the task in the coordinator. Continue only with justified deterministic verification, diff review, or unresolved follow-up.
-- `failed`, `model-mismatch`, `reasoning-mismatch`, `unverified`, or `unverified-no-thread`: do not silently continue model-heavy implementation on the coordinator. Report the routing failure with the requested and observed route. Deterministic inspection is allowed.
-- `budget-blocked`: do not bypass the guard.
-
-The coordinator status line may still show its original model when a pinned worker was used. That is expected. The pixel factory is the default live human-facing progress view when available; the terminal HUD is its fallback. `status --json` remains the machine-readable source of truth for requested model, coordinator model, verified execution model, and route status.
-
-Never claim the selected model was used unless enforcement is `parent-match` or `verified`.
-
-Read only the reference files listed in `plan.skill_refs`. Do not load every craft guide.
-
-## Pinned worker safety
-
-The pinned worker:
-
-- uses the existing Codex/ChatGPT sign-in
-- runs one `codex exec` thread only
-- pins `--model` and `model_reasoning_effort`
-- uses `workspace-write` sandboxing
-- uses non-interactive `approval_policy="never"` inside that sandbox
-- never uses the dangerous sandbox/approval bypass flag
-- does not spawn subagents
-- preserves unrelated user changes
-- records its worker thread id, observed model/reasoning, final message, and worker token usage
-
-If the requested model is unavailable, fail closed. Do not silently substitute Luna or another model.
+Read only the reference files listed in `plan.skill_refs`.
 
 ## Work loop
 
-When the parent thread is the verified execution thread, or after a verified pinned worker has finished, prefer deterministic evidence before any additional model work.
-
-Before another model-heavy action:
+Before another model-heavy step:
 
     & "$HOME\.codex-usage-guard\guard.cmd" capsule --task-id <ID>
 
-After a meaningful action:
+After each meaningful step:
 
     & "$HOME\.codex-usage-guard\guard.cmd" record --task-id <ID> --action "<ACTION>" --kind <deterministic|model> --outcome <info|pass|fail>
 
-Ask for the cheapest valid next operation:
+Use real action names such as:
+- inspect relevant code
+- plan implementation
+- update seller form
+- run targeted tests
+- run build
+- browser verify
+- review diff
+
+Those actions also drive the live visualizer through analyze → plan → work → verify.
+
+Ask for the cheapest justified next operation:
 
     & "$HOME\.codex-usage-guard\guard.cmd" next --task-id <ID> [verification status flags]
 
-The response includes an indexed `action_space`. Treat it as the valid operation set for the current state. Do not invent an expensive extra step when a valid deterministic action is available.
+Treat the returned `action_space` as the valid next-operation set. Prefer deterministic evidence over another reasoning turn.
 
-If `record` rejects an action because a budget is exhausted, do not bypass it automatically. Reassess using exact evidence.
+If the model-turn budget is exhausted, continue only with deterministic checks that remain allowed.
 
-Use only verification commands reported by the guard or explicitly present in repository configuration/CI. Never invent npm, Python, Rust, Go, Java, build, lint, test, or typecheck commands.
+## UI / UX tasks
 
-Compress noisy output before it re-enters model context:
+For UI-relevant tasks, load `references/ui-ux.md` and, when selected, `references/browser-verification.md`.
+
+Before editing:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" ui-context --repo .
+
+After editing:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" ui-audit --repo . --strict --json
+
+The expected UI loop is:
+
+1. inspect the incumbent design system
+2. shape hierarchy and primary action
+3. implement the smallest complete change
+4. run deterministic UI audit
+5. run detected project checks
+6. render the changed flow in a browser when available
+7. critique hierarchy, spacing, typography, states, responsiveness, clipping, and accessibility
+8. make one targeted polish pass
+9. review the final diff
+
+A passing build is not enough proof for UI work.
+
+## Live visualizer
+
+The graphical visualizer is a progress metaphor, not a fake percentage meter.
+
+Its phases correspond to actual task state:
+- analyze
+- plan
+- work
+- verify
+- complete / failed
+
+It does not display or imply model switching.
+
+If graphical rendering is unavailable, Usage Guard falls back to the compact model-neutral terminal HUD.
+
+## Compression
+
+Compress noisy output before returning it to model context:
 
     <DETECTED_TEST_COMMAND> 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type test --task-id <ID>
     git diff 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type git --task-id <ID>
 
-For UI-relevant work, the UI quality loop is mandatory when `references/ui-ux.md` was selected:
-
-    & "$HOME\.codex-usage-guard\guard.cmd" ui-context --repo .
-    & "$HOME\.codex-usage-guard\guard.cmd" ui-audit --repo . --strict --json
-
-Use the first command to preserve the project's existing styling/component system. Treat blocker/important audit findings as defects unless the project clearly and intentionally requires them. The deterministic audit is a quality gate, not a substitute for visual judgement.
-
-After the source audit, if Browser Harness is already installed, prefer real-browser verification before declaring success. Check the changed path at desktop and narrow viewport sizes, then make one targeted polish pass for concrete defects. Browser Use Cloud is optional and must only be used when the user opted in and `BROWSER_USE_API_KEY` is already configured. Core Usage Guard must remain zero-extra-key.
-
-For UI work, a passing build is not enough. Do not finish until hierarchy, spacing, typography, responsive behavior, interaction states, and accessibility have been checked against the selected UI reference.
+Use only verification commands reported by the guard or explicitly present in repository configuration / CI. Never invent project commands.
 
 ## Finish
 
-Verify explicit requirements and the final diff, then:
+After explicit requirements and the final diff are verified:
 
     & "$HOME\.codex-usage-guard\guard.cmd" finish --task-id <ID> --status completed
 
-Report:
-
+Final user-facing output should stay focused on:
 - what changed
 - what was verified
-- requested route
-- route-enforcement status
-- actual execution model/reasoning when verified
-- dedicated worker token usage when a pinned worker was used
-- same-thread or account-meter deltas when available
-- unresolved risks
+- unresolved issues
+- measured token/usage delta when available
 
-Token counts are local Codex telemetry. Rate-limit percentage deltas are coarse account meters and are not the same thing as exact task cost. Never claim an exact percentage of allowance saved without a controlled baseline comparison.
+Do not mention model selection or routing unless the user explicitly asks for it.
 
-Read the bundled references only when the plan requests them:
+## Advanced opt-in model routing
+
+Model routing remains available only as an advanced opt-in compatibility feature:
+
+- `cguard "<task>"` can launch a new Codex session with an explicit route.
+- `guard.cmd enforce --task-id <ID>` can run the legacy pinned-worker path.
+
+Never invoke either automatically from `$usage-guard`.
+
+References are loaded only when selected:
 - `references/routing.md`
 - `references/verification.md`
 - `references/context.md`

@@ -19,11 +19,11 @@ from .hud import AnimatedHUD, HUDState, visual_snapshot
 from .launcher import prepare_launch, preview_launch, resolve_launch_input, run_codex
 from .next_action import predict_next_action
 from .repo import inspect_repo
-from .state import finish_task, latest_active_task_id, load_task, record_action, start_task
+from .state import finish_task, latest_active_task_id, load_task, record_action, start_task, update_visual_state
 from .telemetry import aggregate, record_compression, record_task_summary
 from .ui_quality import audit_ui, inspect_ui_context
 from .usage import usage_delta, usage_snapshot
-from .visualizer import can_open_window
+from .visualizer import can_open_window, spawn_visualizer
 
 
 def _json(data: object) -> None:
@@ -71,13 +71,27 @@ def cmd_start(args: argparse.Namespace) -> int:
     profile = inspect_repo(args.repo)
     plan = classify_task(args.task, args.repo)
     state = start_task(args.task, plan.to_dict(), profile)
+
+    launched = False
+    if os.environ.get("CODEX_USAGE_GUARD_DISABLE_VISUAL") != "1":
+        launched = spawn_visualizer(str(state["task_id"]))
+    update_visual_state(
+        str(state["task_id"]),
+        phase="analyze",
+        activity="inspect",
+        launched=launched,
+    )
+    state = load_task(str(state["task_id"]))
+
     _json(
         {
             "task_id": state["task_id"],
+            "execution_mode": state.get("execution_mode", "current-session"),
             "plan": state["plan"],
             "repo": state["repo"],
             "budget": budget_status(state),
             "usage_before": (state.get("usage") or {}).get("baseline"),
+            "visualizer_started": launched,
         }
     )
     return 0
@@ -116,37 +130,20 @@ def _resolve_active_task_id(task_id: str | None, repo: str) -> str:
     return resolved
 
 
-def _status_payload(state: dict[str, object]) -> dict[str, object]:
+def _status_payload(state: dict[str, object], *, include_routing: bool = False) -> dict[str, object]:
     baseline = (state.get("usage") or {}).get("baseline") or {}
     current = usage_snapshot(
         thread_id=os.environ.get("CODEX_THREAD_ID") or baseline.get("thread_id"),
         repo_root=state.get("repo_root"),
     )
-    enforcement = enforcement_status(state)
-    worker_usage = enforcement.get("worker_usage") if isinstance(enforcement, dict) else None
-    compact_enforcement = {
-        "status": enforcement.get("status"),
-        "requested_model": enforcement.get("requested_model"),
-        "requested_reasoning": enforcement.get("requested_reasoning"),
-        "coordinator_model": enforcement.get("coordinator_model"),
-        "coordinator_reasoning": enforcement.get("coordinator_reasoning"),
-        "effective_model": enforcement.get("effective_model"),
-        "effective_reasoning": enforcement.get("effective_reasoning"),
-        "worker_thread_id": enforcement.get("worker_thread_id"),
-        "worker_tokens_total": worker_usage.get("tokens_total") if isinstance(worker_usage, dict) else None,
-        "worker_token_breakdown": worker_usage.get("token_breakdown") if isinstance(worker_usage, dict) else None,
-    }
-    return {
+    payload: dict[str, object] = {
         "task_id": state.get("task_id"),
         "status": state.get("status"),
         "objective": state.get("objective"),
         "repo_root": state.get("repo_root"),
-        "route": {
-            "profile": state.get("plan", {}).get("agent_profile"),
-            "model": state.get("plan", {}).get("preferred_model"),
-            "reasoning_effort": state.get("plan", {}).get("reasoning_effort"),
-        },
-        "route_enforcement": compact_enforcement,
+        "execution_mode": state.get("execution_mode", "current-session"),
+        "task_kind": state.get("plan", {}).get("task_kind"),
+        "strategy": state.get("plan", {}).get("strategy"),
         "budget": budget_status(state),
         "usage": {
             "before": baseline,
@@ -160,18 +157,20 @@ def _status_payload(state: dict[str, object]) -> dict[str, object]:
             "typecheck": state.get("repo", {}).get("typecheck_command"),
         },
         "skill_refs": state.get("plan", {}).get("skill_refs", []),
+        "visual": state.get("visual"),
     }
+    if include_routing:
+        payload["advanced_routing"] = enforcement_status(state)
+    return payload
 
 
 def cmd_status(args: argparse.Namespace) -> int:
     task_id = _resolve_active_task_id(args.task_id, args.repo)
     state = load_task(task_id)
     if args.json:
-        _json(_status_payload(state))
+        _json(_status_payload(state, include_routing=args.debug_routing))
     else:
-        display_state = dict(state)
-        display_state["execution"] = enforcement_status(state)
-        print(visual_snapshot(display_state))
+        print(visual_snapshot(state))
     return 0
 
 
@@ -267,10 +266,16 @@ def cmd_finish(args: argparse.Namespace) -> int:
         {
             "task_id": args.task_id,
             "status": args.status,
+            "execution_mode": state.get("execution_mode", "current-session"),
             "budget": budget_status(state),
             "compression": aggregate(task_id=args.task_id),
             "usage": state.get("usage"),
-            "route_enforcement": enforcement_status(state),
+            "verification": {
+                "test": state.get("repo", {}).get("test_command"),
+                "build": state.get("repo", {}).get("build_command"),
+                "lint": state.get("repo", {}).get("lint_command"),
+                "typecheck": state.get("repo", {}).get("typecheck_command"),
+            },
         }
     )
     return 0
@@ -475,6 +480,7 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--task-id")
     status.add_argument("--repo", default=".")
     status.add_argument("--json", action="store_true", help="emit machine-readable JSON instead of the visual HUD")
+    status.add_argument("--debug-routing", action="store_true", help="include advanced opt-in model-routing diagnostics")
     status.set_defaults(func=cmd_status)
 
     usage = sub.add_parser("usage", help="read current Codex token/rate-limit telemetry locally")
