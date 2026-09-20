@@ -127,9 +127,9 @@ def _visual_phase_for_action(action: str, kind: str) -> tuple[str, str]:
         return "verify", "verification"
     if any(word in text for word in ("inspect", "trace", "reproduce", "search", "read")) and kind != "model":
         return "analyze", "inspection"
-    if any(word in text for word in ("route", "model", "worker")) and "pinned execution worker" not in text:
-        return "route", "routing"
-    return "execute", "work"
+    if any(word in text for word in ("plan", "map", "design", "shape", "outline", "scope")) and kind != "model":
+        return "plan", "planning"
+    return "work", "work"
 
 
 def record_action(
