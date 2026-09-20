@@ -120,6 +120,52 @@ def _steps_for(kind: str, profile: RepoProfile, complexity: int, risk: int) -> t
     return tuple(dict.fromkeys(base))
 
 
+def policy_for_scores(complexity: int, risk: int) -> dict[str, object]:
+    if complexity <= 2 and risk <= 3:
+        return {
+            "strategy": "single_turn",
+            "routed_agent": "guard_fast",
+            "routed_model": "gpt-5.6-luna",
+            "routed_reasoning": "low",
+            "context_budget": 8_000,
+            "max_turns": 2,
+            "max_retries": 1,
+            "max_actions": 6,
+        }
+    if complexity <= 5 and risk <= 5:
+        return {
+            "strategy": "single_agent",
+            "routed_agent": "guard_worker",
+            "routed_model": "gpt-5.6-terra",
+            "routed_reasoning": "medium",
+            "context_budget": 14_000,
+            "max_turns": 4,
+            "max_retries": 2,
+            "max_actions": 10,
+        }
+    if complexity <= 7 and risk <= 7:
+        return {
+            "strategy": "bounded_agent_loop",
+            "routed_agent": "guard_worker",
+            "routed_model": "gpt-5.6-terra",
+            "routed_reasoning": "high",
+            "context_budget": 20_000,
+            "max_turns": 5,
+            "max_retries": 2,
+            "max_actions": 14,
+        }
+    return {
+        "strategy": "plan_execute_verify",
+        "routed_agent": "guard_reasoner",
+        "routed_model": "gpt-5.6",
+        "routed_reasoning": "high",
+        "context_budget": 28_000,
+        "max_turns": 6,
+        "max_retries": 2,
+        "max_actions": 16,
+    }
+
+
 def classify_task(
     task: str,
     repo_path: str | Path = ".",
@@ -176,42 +222,15 @@ def classify_task(
     risk = max(1, min(10, risk))
     kind = _detect_kind(text, profile)
 
-    if complexity <= 2 and risk <= 3:
-        strategy = "single_turn"
-        routed_agent = "guard_fast"
-        routed_model = "gpt-5.6-luna"
-        routed_reasoning = "low"
-        context_budget = 8_000
-        max_turns = 2
-        max_retries = 1
-        max_actions = 6
-    elif complexity <= 5 and risk <= 5:
-        strategy = "single_agent"
-        routed_agent = "guard_worker"
-        routed_model = "gpt-5.6-terra"
-        routed_reasoning = "medium"
-        context_budget = 14_000
-        max_turns = 4
-        max_retries = 2
-        max_actions = 10
-    elif complexity <= 7 and risk <= 7:
-        strategy = "bounded_agent_loop"
-        routed_agent = "guard_worker"
-        routed_model = "gpt-5.6-terra"
-        routed_reasoning = "high"
-        context_budget = 20_000
-        max_turns = 5
-        max_retries = 2
-        max_actions = 14
-    else:
-        strategy = "plan_execute_verify"
-        routed_agent = "guard_reasoner"
-        routed_model = "gpt-5.6"
-        routed_reasoning = "high"
-        context_budget = 28_000
-        max_turns = 6
-        max_retries = 2
-        max_actions = 16
+    policy = policy_for_scores(complexity, risk)
+    strategy = str(policy["strategy"])
+    routed_agent = str(policy["routed_agent"])
+    routed_model = str(policy["routed_model"])
+    routed_reasoning = str(policy["routed_reasoning"])
+    context_budget = int(policy["context_budget"])
+    max_turns = int(policy["max_turns"])
+    max_retries = int(policy["max_retries"])
+    max_actions = int(policy["max_actions"])
 
     if route_models:
         agent = routed_agent
