@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0
+
+- add a compact zero-dependency Guard HUD for guarded-task progress
+- animate the HUD in terminals that support live redraw
+- fall back to one small visual snapshot when live animation is unavailable
+- show route flow visually instead of dumping JSON by default for status/enforcement
+- visualize coordinator -> requested model routing, reasoning level, action budget, model-turn budget, worker token total, and route outcome
+- reserve a visual judgement stage for the planned adaptive task judge
+- keep `--json` on status/enforce for machine-readable Skill control
+- preserve the v0.5 pinned-worker route enforcement and verification behavior
+
+
 ## 0.5.0
 
 - enforce the selected model and reasoning from inside an already-open Codex session

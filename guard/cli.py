@@ -15,6 +15,7 @@ from .classifier import classify_task
 from .compressor import compress, estimate_tokens
 from .context import make_capsule
 from .executor import enforce_task, enforcement_status
+from .hud import AnimatedHUD, HUDState, visual_snapshot
 from .launcher import prepare_launch, preview_launch, resolve_launch_input, run_codex
 from .next_action import predict_next_action
 from .repo import inspect_repo
@@ -113,9 +114,7 @@ def _resolve_active_task_id(task_id: str | None, repo: str) -> str:
     return resolved
 
 
-def cmd_status(args: argparse.Namespace) -> int:
-    task_id = _resolve_active_task_id(args.task_id, args.repo)
-    state = load_task(task_id)
+def _status_payload(state: dict[str, object]) -> dict[str, object]:
     baseline = (state.get("usage") or {}).get("baseline") or {}
     current = usage_snapshot(
         thread_id=os.environ.get("CODEX_THREAD_ID") or baseline.get("thread_id"),
@@ -135,33 +134,42 @@ def cmd_status(args: argparse.Namespace) -> int:
         "worker_tokens_total": worker_usage.get("tokens_total") if isinstance(worker_usage, dict) else None,
         "worker_token_breakdown": worker_usage.get("token_breakdown") if isinstance(worker_usage, dict) else None,
     }
-    _json(
-        {
-            "task_id": task_id,
-            "status": state.get("status"),
-            "objective": state.get("objective"),
-            "repo_root": state.get("repo_root"),
-            "route": {
-                "profile": state.get("plan", {}).get("agent_profile"),
-                "model": state.get("plan", {}).get("preferred_model"),
-                "reasoning_effort": state.get("plan", {}).get("reasoning_effort"),
-            },
-            "route_enforcement": compact_enforcement,
-            "budget": budget_status(state),
-            "usage": {
-                "before": baseline,
-                "current": current,
-                "delta": usage_delta(baseline, current),
-            },
-            "verification": {
-                "test": state.get("repo", {}).get("test_command"),
-                "build": state.get("repo", {}).get("build_command"),
-                "lint": state.get("repo", {}).get("lint_command"),
-                "typecheck": state.get("repo", {}).get("typecheck_command"),
-            },
-            "skill_refs": state.get("plan", {}).get("skill_refs", []),
-        }
-    )
+    return {
+        "task_id": state.get("task_id"),
+        "status": state.get("status"),
+        "objective": state.get("objective"),
+        "repo_root": state.get("repo_root"),
+        "route": {
+            "profile": state.get("plan", {}).get("agent_profile"),
+            "model": state.get("plan", {}).get("preferred_model"),
+            "reasoning_effort": state.get("plan", {}).get("reasoning_effort"),
+        },
+        "route_enforcement": compact_enforcement,
+        "budget": budget_status(state),
+        "usage": {
+            "before": baseline,
+            "current": current,
+            "delta": usage_delta(baseline, current),
+        },
+        "verification": {
+            "test": state.get("repo", {}).get("test_command"),
+            "build": state.get("repo", {}).get("build_command"),
+            "lint": state.get("repo", {}).get("lint_command"),
+            "typecheck": state.get("repo", {}).get("typecheck_command"),
+        },
+        "skill_refs": state.get("plan", {}).get("skill_refs", []),
+    }
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    task_id = _resolve_active_task_id(args.task_id, args.repo)
+    state = load_task(task_id)
+    if args.json:
+        _json(_status_payload(state))
+    else:
+        display_state = dict(state)
+        display_state["execution"] = enforcement_status(state)
+        print(visual_snapshot(display_state))
     return 0
 
 
@@ -172,12 +180,44 @@ def cmd_usage(args: argparse.Namespace) -> int:
 
 
 def cmd_enforce(args: argparse.Namespace) -> int:
-    result = enforce_task(
-        args.task_id,
-        force_worker=args.force_worker,
-        timeout_seconds=args.timeout,
+    state = load_task(args.task_id)
+    plan = state.get("plan", {})
+    budget = budget_status(state)
+    initial = enforcement_status(state)
+    hud_state = HUDState(
+        phase="execute",
+        coordinator_model=initial.get("coordinator_model"),
+        requested_model=initial.get("requested_model") or plan.get("preferred_model"),
+        reasoning=initial.get("requested_reasoning") or plan.get("reasoning_effort"),
+        action_used=budget["used"]["actions"],
+        action_limit=budget["limits"]["actions"],
+        model_turns_used=budget["used"]["model_turns"],
+        model_turns_limit=budget["limits"]["model_turns"],
+        judge_used=bool(state.get("judgement")),
     )
-    _json(result)
+    hud = AnimatedHUD(hud_state, enabled=False if args.json else None)
+    hud.start()
+    try:
+        result = enforce_task(
+            args.task_id,
+            force_worker=args.force_worker,
+            timeout_seconds=args.timeout,
+        )
+    finally:
+        final_state = load_task(args.task_id)
+        execution = final_state.get("execution") or {}
+        worker_usage = execution.get("worker_usage") or {}
+        tokens = worker_usage.get("tokens_total")
+        hud_state.phase = "verify"
+        hud.stop(
+            final_status=execution.get("status"),
+            tokens=tokens if isinstance(tokens, int) else None,
+        )
+
+    if args.json:
+        _json(result)
+    elif not hud.enabled:
+        print(visual_snapshot(final_state))
     return 0 if result.get("status") in {"parent-match", "verified"} else 3
 
 
@@ -399,6 +439,7 @@ def build_parser() -> argparse.ArgumentParser:
     status = sub.add_parser("status", help="show route, budget, verification, and before/after Codex usage")
     status.add_argument("--task-id")
     status.add_argument("--repo", default=".")
+    status.add_argument("--json", action="store_true", help="emit machine-readable JSON instead of the visual HUD")
     status.set_defaults(func=cmd_status)
 
     usage = sub.add_parser("usage", help="read current Codex token/rate-limit telemetry locally")
@@ -409,6 +450,7 @@ def build_parser() -> argparse.ArgumentParser:
     enforce.add_argument("--task-id", required=True)
     enforce.add_argument("--force-worker", action="store_true")
     enforce.add_argument("--timeout", type=int, default=1800)
+    enforce.add_argument("--json", action="store_true", help="emit machine-readable JSON and disable animation")
     enforce.set_defaults(func=cmd_enforce)
 
     fn = sub.add_parser("finish", help="close a guarded task and write summary telemetry")

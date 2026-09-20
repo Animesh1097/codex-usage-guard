@@ -11,7 +11,7 @@ The user should be able to stay inside Codex after the one-time install. Treat t
 
 Interpret these without starting a new task:
 
-- `$usage-guard status` -> run `guard.cmd status --repo .`
+- `$usage-guard status` -> run `guard.cmd status --repo .` and show the compact visual HUD by default
 - `$usage-guard usage` -> run `guard.cmd usage --repo .`
 - `$usage-guard budget` -> resolve the active task for this repo, then show its status/budget
 - `$usage-guard stop` -> finish the active task as blocked or abandoned according to the user's intent
@@ -28,18 +28,22 @@ Otherwise on Windows:
 
 Keep the returned `task_id`. The plan includes model/reasoning policy, budgets, verification commands, local usage baseline, and zero-to-two task-specific reference files.
 
-Immediately enforce the route:
+Immediately enforce the route. This command shows the compact animated Guard HUD when the terminal supports live redraw:
 
     & "$HOME\.codex-usage-guard\guard.cmd" enforce --task-id <ID>
 
-Interpret the enforcement result strictly:
+After enforcement, read the machine result without replacing the user-facing HUD:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" status --task-id <ID> --json
+
+Interpret the enforcement/status result strictly:
 
 - `parent-match`: the current Codex thread already matches both selected model and reasoning. Continue in this thread.
 - `verified`: a single pinned `codex exec` worker ran the objective using the selected model/reasoning and Codex local thread telemetry verified both. Do not re-implement the task in the coordinator. Continue only with justified deterministic verification, diff review, or unresolved follow-up.
 - `failed`, `model-mismatch`, `reasoning-mismatch`, `unverified`, or `unverified-no-thread`: do not silently continue model-heavy implementation on the coordinator. Report the routing failure with the requested and observed route. Deterministic inspection is allowed.
 - `budget-blocked`: do not bypass the guard.
 
-The coordinator status line may still show its original model when a pinned worker was used. That is expected. `$usage-guard status` is the source of truth for requested model, coordinator model, verified execution model, and route status.
+The coordinator status line may still show its original model when a pinned worker was used. That is expected. The Guard HUD is the default human-facing progress view; `status --json` is the machine-readable source of truth for requested model, coordinator model, verified execution model, and route status.
 
 Never claim the selected model was used unless enforcement is `parent-match` or `verified`.
 
