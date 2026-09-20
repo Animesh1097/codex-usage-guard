@@ -35,13 +35,24 @@ def phase_from_state(state: dict[str, Any] | None) -> str:
         return "analyze"
     visual = state.get("visual") or {}
     phase = str(visual.get("phase") or "").lower()
-    if phase in {"analyze", "judge", "route", "execute", "verify", "complete", "failed"}:
+    aliases = {
+        "route": "plan",
+        "execute": "work",
+        "judge": "plan",
+    }
+    phase = aliases.get(phase, phase)
+    if phase in {"analyze", "plan", "work", "verify", "complete", "failed"}:
         return phase
-    execution = state.get("execution") or {}
-    status = execution.get("status")
-    if status in {"verified", "parent-match"}:
+
+    status = str(state.get("status") or "")
+    if status == "completed":
         return "complete"
-    if status in {"failed", "model-mismatch", "reasoning-mismatch", "budget-blocked", "unverified", "unverified-no-thread"}:
+    if status in {"blocked", "abandoned", "failed"}:
+        return "failed"
+
+    execution = state.get("execution") or {}
+    exec_status = execution.get("status")
+    if exec_status in {"failed", "model-mismatch", "reasoning-mismatch", "budget-blocked"}:
         return "failed"
     return "analyze"
 
@@ -53,26 +64,28 @@ def activity_from_state(state: dict[str, Any] | None) -> str:
     return str(visual.get("activity") or "idle")
 
 
-def selected_model(state: dict[str, Any] | None) -> str:
+def task_kind_from_state(state: dict[str, Any] | None) -> str:
     if not state:
-        return ""
-    execution = state.get("execution") or {}
+        return "general"
     plan = state.get("plan") or {}
-    return str(
-        execution.get("effective_model")
-        or execution.get("requested_model")
-        or plan.get("preferred_model")
-        or ""
-    )
+    return str(plan.get("task_kind") or "general")
 
 
-def model_palette(model: str) -> tuple[str, str, str]:
-    model = model.lower()
-    if "luna" in model:
-        return ("#78a9ff", "#4f7edb", "#dce9ff")
-    if "terra" in model:
-        return ("#4fd1a1", "#2a9d77", "#d8fff1")
-    return ("#f6c85f", "#c99527", "#fff1bf")
+def task_palette(kind: str) -> tuple[str, str, str]:
+    kind = kind.lower()
+    if kind == "ui":
+        return ("#c882ff", "#7844b8", "#f0dcff")
+    if kind == "debugging":
+        return ("#ffad5c", "#b76b2e", "#ffe4c7")
+    if kind == "database":
+        return ("#53d7c2", "#278f82", "#d5fff8")
+    if kind == "security":
+        return ("#ff6f78", "#b33f47", "#ffd8db")
+    if kind == "deployment":
+        return ("#ffd166", "#b38b2f", "#fff2bd")
+    if kind == "docs":
+        return ("#78a9ff", "#4674c3", "#dce9ff")
+    return ("#65d6a5", "#328e6c", "#d9fff0")
 
 
 def _safe_tk() -> tuple[Any, Any] | tuple[None, None]:
@@ -98,6 +111,7 @@ def spawn_visualizer(task_id: str, *, install_root: Path | None = None) -> bool:
         return False
     if not can_open_window():
         return False
+
     install_root = install_root or Path(__file__).resolve().parents[1]
     command = [sys.executable, "-m", "guard.visualizer", "--task-id", task_id]
     kwargs: dict[str, Any] = {
@@ -108,12 +122,13 @@ def spawn_visualizer(task_id: str, *, install_root: Path | None = None) -> bool:
         "close_fds": os.name != "nt",
     }
     if os.name == "nt":
-        creationflags = 0
-        creationflags |= getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
-        creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
-        kwargs["creationflags"] = creationflags
+        kwargs["creationflags"] = (
+            getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+            | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+        )
     else:
         kwargs["start_new_session"] = True
+
     try:
         subprocess.Popen(command, **kwargs)
         return True
@@ -122,8 +137,9 @@ def spawn_visualizer(task_id: str, *, install_root: Path | None = None) -> bool:
 
 
 class PixelFactory:
-    WIDTH = 560
-    HEIGHT = 330
+    WIDTH = 640
+    HEIGHT = 390
+    PHASES = ("analyze", "plan", "work", "verify")
 
     def __init__(self, task_id: str, *, topmost: bool = True, auto_close_seconds: float = 3.5) -> None:
         tk, _ = _safe_tk()
@@ -134,7 +150,7 @@ class PixelFactory:
         self.auto_close_seconds = auto_close_seconds
         self.root = tk.Tk()
         self.root.title("Codex Usage Guard")
-        self.root.configure(bg="#111722")
+        self.root.configure(bg="#0d1420")
         self.root.resizable(False, False)
         self.root.geometry(f"{self.WIDTH}x{self.HEIGHT}")
         try:
@@ -146,7 +162,7 @@ class PixelFactory:
             self.root,
             width=self.WIDTH,
             height=self.HEIGHT,
-            bg="#111722",
+            bg="#0d1420",
             highlightthickness=0,
         )
         self.canvas.pack(fill="both", expand=True)
@@ -154,15 +170,15 @@ class PixelFactory:
         self.frame = 0
         self.last_state: dict[str, Any] | None = None
         self.terminal_since: float | None = None
-        self.random = random.Random(17)
+        self.random = random.Random(23)
         self.confetti = [
             (
-                self.random.randint(120, 520),
-                self.random.randint(-80, 20),
-                self.random.choice(("#69d2ff", "#f7d267", "#80e3a5", "#ff8db1", "#ffffff")),
+                self.random.randint(70, self.WIDTH - 70),
+                self.random.randint(-110, 30),
+                self.random.choice(("#69d2ff", "#ffd166", "#80e3a5", "#ff8db1", "#ffffff")),
                 self.random.randint(1, 4),
             )
-            for _ in range(46)
+            for _ in range(58)
         ]
 
         self._position_window()
@@ -173,8 +189,8 @@ class PixelFactory:
         try:
             screen_w = self.root.winfo_screenwidth()
             screen_h = self.root.winfo_screenheight()
-            x = max(10, screen_w - self.WIDTH - 28)
-            y = max(10, screen_h - self.HEIGHT - 72)
+            x = max(12, screen_w - self.WIDTH - 28)
+            y = max(12, screen_h - self.HEIGHT - 72)
             self.root.geometry(f"{self.WIDTH}x{self.HEIGHT}+{x}+{y}")
         except Exception:
             pass
@@ -182,16 +198,54 @@ class PixelFactory:
     def _rect(self, x1: int, y1: int, x2: int, y2: int, fill: str, outline: str = "", width: int = 1) -> None:
         self.canvas.create_rectangle(x1, y1, x2, y2, fill=fill, outline=outline, width=width)
 
-    def _floor(self) -> None:
-        self._rect(0, 0, self.WIDTH, self.HEIGHT, "#192332")
-        tile = 32
+    def _background(self) -> None:
+        self._rect(0, 0, self.WIDTH, self.HEIGHT, "#0f1825")
+        self._rect(0, 0, self.WIDTH, 58, "#111d2b")
+        self._rect(0, 58, self.WIDTH, self.HEIGHT, "#172334")
+
+        # Factory floor with restrained perspective/grid texture.
+        tile = 36
         for x in range(0, self.WIDTH, tile):
-            self.canvas.create_line(x, 0, x, self.HEIGHT, fill="#243245")
-        for y in range(0, self.HEIGHT, tile):
-            self.canvas.create_line(0, y, self.WIDTH, y, fill="#243245")
+            self.canvas.create_line(x, 58, x, self.HEIGHT, fill="#223249")
+        for y in range(58, self.HEIGHT, tile):
+            self.canvas.create_line(0, y, self.WIDTH, y, fill="#223249")
         for x in range(0, self.WIDTH, tile * 2):
-            for y in range(0, self.HEIGHT, tile * 2):
-                self._rect(x + 2, y + 2, x + tile - 2, y + tile - 2, "#1c2838")
+            for y in range(58, self.HEIGHT, tile * 2):
+                self._rect(x + 2, y + 2, x + tile - 2, y + tile - 2, "#1a293b")
+
+        # Ambient wall lights.
+        for x in (24, 94, 546, 616):
+            self._rect(x - 6, 74, x + 6, 88, "#273b51", "#0b1119", 2)
+            self._rect(x - 3, 77, x + 3, 85, "#7d91a8")
+
+    def _progress_rail(self, phase: str, accent: str) -> None:
+        effective = "verify" if phase == "complete" else phase
+        idx = self.PHASES.index(effective) if effective in self.PHASES else 0
+        xs = (220, 286, 352, 418)
+        self.canvas.create_line(xs[0], 29, xs[-1], 29, fill="#31465d", width=4)
+        for i, x in enumerate(xs):
+            if i < idx:
+                fill = accent
+                radius = 7
+            elif i == idx:
+                pulse = 2 + int(2 * (1 + math.sin(self.frame / 4)))
+                fill = accent
+                radius = 7 + pulse
+            else:
+                fill = "#33475e"
+                radius = 7
+            self.canvas.create_oval(x - radius, 29 - radius, x + radius, 29 + radius, fill=fill, outline="#0b1119", width=2)
+
+    def _status_beacon(self, phase: str, accent: str) -> None:
+        if phase == "failed":
+            color = "#ff6673"
+        elif phase == "complete":
+            color = "#65e391"
+        else:
+            color = accent
+        glow = 3 + int(2 * (1 + math.sin(self.frame / 3)))
+        self.canvas.create_oval(28 - glow, 28 - glow, 44 + glow, 44 + glow, outline=color, width=2)
+        self.canvas.create_oval(30, 30, 42, 42, fill=color, outline="#0b1119", width=2)
 
     def _pipe(self, points: list[int]) -> None:
         self.canvas.create_line(*points, fill="#0c1119", width=14, joinstyle="miter")
@@ -200,209 +254,196 @@ class PixelFactory:
             x, y = points[i], points[i + 1]
             self.canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill="#53657d", outline="#0c1119")
 
-    def _machine(self, x: int, y: int, accent: str, active: bool = False) -> None:
-        glow = accent if active else "#385064"
-        self._rect(x, y, x + 82, y + 66, "#2c394a", "#0c1119", 3)
-        self._rect(x + 8, y + 8, x + 74, y + 28, "#13202d", "#0c1119", 2)
-        for i in range(4):
-            h = 5 + ((self.frame + i * 3) % 9 if active else 2)
-            self._rect(x + 16 + i * 12, y + 23 - h, x + 22 + i * 12, y + 23, glow)
-        self._rect(x + 12, y + 38, x + 25, y + 51, "#111820", "#0c1119", 2)
-        self._rect(x + 30, y + 39, x + 65, y + 48, "#45566b", "#0c1119", 2)
-        self._rect(x + 30, y + 53, x + 54, y + 58, accent if active else "#6a7887")
-
-    def _scanner(self, x: int, y: int, accent: str, active: bool = False) -> None:
-        self._rect(x, y, x + 66, y + 60, "#253548", "#0b1119", 3)
-        self._rect(x + 8, y + 8, x + 58, y + 42, "#0f1822", "#0b1119", 2)
-        pulse = 3 + int(3 * (1 + math.sin(self.frame / 4)))
-        self.canvas.create_oval(
-            x + 24 - pulse,
-            y + 19 - pulse,
-            x + 42 + pulse,
-            y + 37 + pulse,
-            outline=accent if active else "#50627a",
-            width=3,
-        )
-        self._rect(x + 16, y + 49, x + 50, y + 54, accent if active else "#53657a")
-
     def _worker(self, x: int, y: int, *, facing: int = 1, carry: bool = False, accent: str = "#ff9d42") -> None:
         bob = int(2 * math.sin(self.frame / 3 + x))
         y += bob
-        skin = "#f3bf83"
-        shirt = "#3c88c8"
-        pants = "#234e78"
+        skin = "#f2bd81"
+        shirt = "#3b86c7"
+        pants = "#214b72"
         self._rect(x + 6, y, x + 21, y + 7, accent, "#10151d", 2)
         self._rect(x + 4, y + 7, x + 23, y + 14, skin, "#10151d", 2)
         self._rect(x + 7, y + 14, x + 20, y + 30, shirt, "#10151d", 2)
         arm_y = y + 17
         if carry:
-            self._rect(x + (20 if facing > 0 else -2), arm_y, x + (28 if facing > 0 else 6), arm_y + 6, skin, "#10151d", 1)
+            dx = 8 if facing > 0 else -8
+            self._rect(x + 11 + dx, arm_y, x + 19 + dx, arm_y + 6, skin, "#10151d", 1)
         else:
             self._rect(x + 1, arm_y, x + 7, arm_y + 9, skin, "#10151d", 1)
             self._rect(x + 20, arm_y, x + 26, arm_y + 9, skin, "#10151d", 1)
         self._rect(x + 6, y + 30, x + 12, y + 41, pants, "#10151d", 1)
         self._rect(x + 15, y + 30, x + 21, y + 41, pants, "#10151d", 1)
 
-    def _cube(self, x: float, y: float, accent: str, *, glow: bool = True) -> None:
-        size = 16
+    def _task_block(self, x: float, y: float, accent: str, *, glow: bool = True) -> None:
+        size = 17
         if glow:
-            radius = 22 + int(2 * math.sin(self.frame / 3))
-            self.canvas.create_oval(
-                x - radius,
-                y - radius,
-                x + radius,
-                y + radius,
-                fill="",
-                outline=accent,
-                width=1,
-            )
-        self._rect(int(x - size), int(y - size), int(x + size), int(y + size), "#d9f0ff", "#0c1119", 2)
+            radius = 25 + int(3 * math.sin(self.frame / 3))
+            self.canvas.create_oval(x - radius, y - radius, x + radius, y + radius, outline=accent, width=1)
+        self._rect(int(x - size), int(y - size), int(x + size), int(y + size), "#e2f1ff", "#0b1119", 2)
         self.canvas.create_polygon(
-            x - size, y - size,
-            x, y - size - 7,
-            x + size, y - size,
-            x, y - size + 7,
+            x - size,
+            y - size,
+            x,
+            y - size - 8,
+            x + size,
+            y - size,
+            x,
+            y - size + 8,
             fill=accent,
-            outline="#0c1119",
+            outline="#0b1119",
         )
-        self._rect(int(x - 6), int(y - 5), int(x + 6), int(y + 7), accent, "#0c1119", 1)
+        self._rect(int(x - 7), int(y - 5), int(x + 7), int(y + 8), accent, "#0b1119", 1)
 
-    def _conveyor(self, x1: int, y1: int, x2: int, y2: int, active: bool) -> None:
-        self._rect(x1, y1, x2, y2, "#121920", "#0b1119", 3)
-        step = 22
+    def _analyze_station(self, active: bool, accent: str) -> None:
+        x, y = 58, 112
+        self._rect(x, y, x + 110, y + 80, "#24364a", "#0b1119", 3)
+        self._rect(x + 12, y + 11, x + 98, y + 54, "#0e1721", "#0b1119", 2)
+        beam = accent if active else "#4d6178"
+        sweep = (self.frame * 4) % 70
+        if active:
+            self.canvas.create_line(x + 18 + sweep, y + 16, x + 18 + sweep, y + 49, fill=beam, width=3)
+        for i in range(4):
+            self._rect(x + 18 + i * 17, y + 62, x + 29 + i * 17, y + 68, beam if active and i == (self.frame // 5) % 4 else "#5a6d82")
+
+    def _plan_station(self, active: bool, accent: str) -> None:
+        x, y = 198, 90
+        self._rect(x, y, x + 118, y + 100, "#233348", "#0b1119", 3)
+        self._rect(x + 12, y + 12, x + 106, y + 73, "#102034", "#0b1119", 2)
+        nodes = [(x + 30, y + 30), (x + 58, y + 48), (x + 84, y + 28), (x + 83, y + 61)]
+        for a, b in ((0, 1), (1, 2), (1, 3)):
+            self.canvas.create_line(*nodes[a], *nodes[b], fill=accent if active else "#536980", width=2)
+        for i, (nx, ny) in enumerate(nodes):
+            pulse = 2 if active and i == (self.frame // 7) % len(nodes) else 0
+            self.canvas.create_oval(nx - 5 - pulse, ny - 5 - pulse, nx + 5 + pulse, ny + 5 + pulse, fill=accent if active else "#607389", outline="#0b1119")
+        self._rect(x + 26, y + 80, x + 92, y + 88, accent if active else "#506278")
+
+    def _work_station(self, active: bool, accent: str) -> None:
+        x, y = 342, 102
+        self._rect(x, y, x + 120, y + 88, "#26374a", "#0b1119", 3)
+        self._rect(x + 10, y + 10, x + 110, y + 34, "#0e1822", "#0b1119", 2)
+        for i in range(5):
+            h = 5 + (((self.frame + i * 3) % 12) if active else 2)
+            self._rect(x + 20 + i * 16, y + 29 - h, x + 28 + i * 16, y + 29, accent if active else "#506278")
+        gear_color = accent if active else "#52677e"
+        cx, cy = x + 38, y + 61
+        radius = 15
+        for i in range(8):
+            angle = self.frame / 6 + i * math.pi / 4
+            gx = cx + int(math.cos(angle) * radius)
+            gy = cy + int(math.sin(angle) * radius)
+            self._rect(gx - 3, gy - 3, gx + 3, gy + 3, gear_color)
+        self.canvas.create_oval(cx - 9, cy - 9, cx + 9, cy + 9, fill="#172433", outline=gear_color, width=3)
+        self._rect(x + 70, y + 52, x + 104, y + 67, "#172433", "#0b1119", 2)
+        self._rect(x + 73, y + 55, x + 101, y + 64, gear_color)
+
+    def _verify_station(self, active: bool, success: bool, accent: str) -> None:
+        x, y = 505, 102
+        color = "#65e391" if success else (accent if active else "#52657c")
+        self._rect(x, y, x + 18, y + 92, "#263647", "#0b1119", 3)
+        self._rect(x + 70, y, x + 88, y + 92, "#263647", "#0b1119", 3)
+        self.canvas.create_line(x + 18, y + 12, x + 70, y + 12, fill=color, width=4)
+        self.canvas.create_line(x + 18, y + 82, x + 70, y + 82, fill="#394d63", width=4)
+        if active or success:
+            scan_y = y + 24 + ((self.frame * 4) % 46)
+            self.canvas.create_line(x + 23, scan_y, x + 65, scan_y, fill=color, width=3)
+            self.canvas.create_line(x + 27, scan_y + 4, x + 61, scan_y + 4, fill=color, width=1)
+
+    def _conveyor(self, active: bool, accent: str) -> None:
+        x1, y1, x2, y2 = 88, 218, 566, 258
+        self._rect(x1, y1, x2, y2, "#101820", "#0b1119", 3)
+        step = 25
         offset = (self.frame * 3) % step if active else 0
         for x in range(x1 - step, x2 + step, step):
             px = x + offset
-            self.canvas.create_line(px, y1 + 4, px + 9, y2 - 4, fill="#405269", width=4)
+            self.canvas.create_line(px, y1 + 4, px + 10, y2 - 4, fill="#405269", width=4)
+        self.canvas.create_line(x1, y1 - 6, x2, y1 - 6, fill=accent if active else "#405269", width=2)
 
-    def _route_gate(self, x: int, y: int, accent: str, active: bool) -> None:
-        self._rect(x, y, x + 46, y + 76, "#202c3b", "#0b1119", 3)
-        self._rect(x + 9, y + 10, x + 37, y + 28, "#0f1822", "#0b1119", 2)
-        light = accent if active else "#47596d"
-        for i in range(3):
-            self.canvas.create_oval(x + 12 + i * 9, y + 15, x + 18 + i * 9, y + 21, fill=light, outline="")
-        self._rect(x + 18, y + 34, x + 28, y + 67, light if active else "#38475b")
-
-    def _verify_gate(self, x: int, y: int, active: bool, success: bool) -> None:
-        color = "#63e68f" if success else ("#76b9ff" if active else "#46566b")
-        self._rect(x, y, x + 18, y + 82, "#263647", "#0b1119", 3)
-        self._rect(x + 52, y, x + 70, y + 82, "#263647", "#0b1119", 3)
-        self.canvas.create_line(x + 18, y + 12, x + 52, y + 12, fill=color, width=4)
-        if active or success:
-            scan_y = y + 22 + ((self.frame * 4) % 44)
-            self.canvas.create_line(x + 20, scan_y, x + 50, scan_y, fill=color, width=3)
-
-    def _status_lights(self, model: str, status: str) -> None:
-        primary, _, _ = model_palette(model)
-        positions = [(34, 24), (58, 24), (82, 24)]
-        active_idx = 0 if "luna" in model.lower() else 1 if "terra" in model.lower() else 2
-        for i, (x, y) in enumerate(positions):
-            fill = primary if i == active_idx else "#334459"
-            self.canvas.create_oval(x - 7, y - 7, x + 7, y + 7, fill=fill, outline="#0b1119", width=2)
-        status_color = "#63e68f" if status in {"complete", "verified", "parent-match"} else "#ff6e7a" if status == "failed" else "#f0c96a"
-        self._rect(104, 16, 122, 32, status_color, "#0b1119", 2)
-
-    def _task_progress(self, phase: str, accent: str) -> tuple[float, float]:
-        # No fake percentage: the cube occupies the real phase's station and loops locally while work continues.
+    def _task_position(self, phase: str) -> tuple[float, float]:
         if phase == "analyze":
-            return 105 + 8 * math.sin(self.frame / 5), 126
-        if phase == "judge":
-            return 182 + 6 * math.sin(self.frame / 4), 126
-        if phase == "route":
-            return 260 + 5 * math.sin(self.frame / 3), 150
-        if phase == "execute":
-            return 350 + ((self.frame * 2) % 72), 190
-        if phase in {"verify", "complete", "failed"}:
-            return 482, 176
-        return 110, 126
+            return 112 + 8 * math.sin(self.frame / 5), 172
+        if phase == "plan":
+            return 258 + 7 * math.sin(self.frame / 4), 199
+        if phase == "work":
+            return 382 + ((self.frame * 2) % 60), 238
+        return 548, 176
+
+    def _workers(self, phase: str, accent: str) -> None:
+        positions = {
+            "analyze": ((82, 270), (156, 278), (392, 292)),
+            "plan": ((218, 275), (295, 278), (430, 292)),
+            "work": ((342, 286), (415, 275), (492, 294)),
+            "verify": ((470, 286), (535, 276), (585, 294)),
+            "complete": ((220, 286), (306, 280), (405, 286)),
+            "failed": ((224, 288), (324, 286), (424, 288)),
+        }
+        for i, (x, y) in enumerate(positions.get(phase, positions["analyze"])):
+            self._worker(
+                x,
+                y,
+                facing=-1 if i == 2 else 1,
+                carry=phase in {"plan", "work"} and i == 1,
+                accent="#f0a24b" if i != 2 else "#65b6f5",
+            )
 
     def _activity_particles(self, phase: str, activity: str, accent: str) -> None:
-        if phase == "execute":
-            for i in range(8):
-                x = 335 + (i * 19 + self.frame * 5) % 120
-                y = 112 + ((i * 13 + self.frame * 3) % 54)
+        if phase == "work":
+            for i in range(10):
+                x = 354 + (i * 21 + self.frame * 5) % 112
+                y = 86 + ((i * 13 + self.frame * 3) % 62)
                 self._rect(x, y, x + 3, y + 3, accent)
-        if activity in {"command_execution", "mcp_tool_call", "file_change"}:
-            for i in range(7):
-                angle = (self.frame + i * 5) * 0.45
-                x = 392 + int(math.cos(angle) * (16 + i))
-                y = 96 + int(math.sin(angle) * (10 + i // 2))
+        if activity in {"verification", "file_change", "command_execution", "work"}:
+            for i in range(8):
+                angle = (self.frame + i * 5) * 0.38
+                x = 407 + int(math.cos(angle) * (17 + i))
+                y = 181 + int(math.sin(angle) * (10 + i // 2))
                 self._rect(x, y, x + 2, y + 2, "#ffd46a")
 
     def _complete_overlay(self, success: bool) -> None:
-        color = "#56d98a" if success else "#ff6f7a"
-        self._rect(154, 98, 406, 218, "#101820", "#0b1119", 4)
-        self._rect(165, 109, 395, 207, "#1c2a38", color, 3)
+        color = "#5fe092" if success else "#ff6f7a"
+        self._rect(180, 90, 460, 250, "#0e1722", "#0b1119", 4)
+        self._rect(193, 103, 447, 237, "#172636", color, 3)
         if success:
-            # trophy silhouette
-            self._rect(260, 126, 300, 165, "#f1c64d", "#0b1119", 3)
-            self._rect(272, 165, 288, 180, "#d49f28", "#0b1119", 2)
-            self._rect(258, 180, 302, 189, "#f1c64d", "#0b1119", 2)
-            self.canvas.create_arc(244, 128, 266, 154, start=90, extent=180, style="arc", outline="#f1c64d", width=5)
-            self.canvas.create_arc(294, 128, 316, 154, start=-90, extent=180, style="arc", outline="#f1c64d", width=5)
-            self.canvas.create_line(269, 144, 279, 154, 294, 134, fill="#ffffff", width=5)
+            self._rect(294, 126, 346, 177, "#f1c64d", "#0b1119", 3)
+            self._rect(311, 177, 329, 198, "#d49f28", "#0b1119", 2)
+            self._rect(286, 198, 354, 209, "#f1c64d", "#0b1119", 2)
+            self.canvas.create_arc(272, 130, 300, 164, start=90, extent=180, style="arc", outline="#f1c64d", width=6)
+            self.canvas.create_arc(340, 130, 368, 164, start=-90, extent=180, style="arc", outline="#f1c64d", width=6)
+            self.canvas.create_line(304, 149, 317, 163, 339, 137, fill="#ffffff", width=6)
         else:
-            self.canvas.create_line(256, 132, 304, 180, fill=color, width=8)
-            self.canvas.create_line(304, 132, 256, 180, fill=color, width=8)
+            self.canvas.create_line(278, 128, 362, 208, fill=color, width=10)
+            self.canvas.create_line(362, 128, 278, 208, fill=color, width=10)
 
     def _confetti(self) -> None:
         for i, (x, y0, color, speed) in enumerate(self.confetti):
-            y = (y0 + self.frame * speed * 2) % (self.HEIGHT + 80) - 30
-            drift = int(8 * math.sin((self.frame + i) / 4))
-            self._rect(x + drift, y, x + drift + 4, y + 7, color)
+            y = (y0 + self.frame * speed * 2) % (self.HEIGHT + 100) - 40
+            drift = int(9 * math.sin((self.frame + i) / 4))
+            self._rect(x + drift, y, x + drift + 4, y + 8, color)
 
     def draw(self, state: dict[str, Any] | None) -> None:
         self.canvas.delete("all")
-        self._floor()
+        self._background()
+
         phase = phase_from_state(state)
         activity = activity_from_state(state)
-        model = selected_model(state)
-        accent, accent_dark, accent_soft = model_palette(model)
-        status = "failed" if phase == "failed" else "complete" if phase == "complete" else str((state or {}).get("execution", {}).get("status") or "active")
+        kind = task_kind_from_state(state)
+        accent, accent_dark, accent_soft = task_palette(kind)
 
-        self._pipe([0, 68, 52, 68, 52, 110, 142, 110])
-        self._pipe([560, 62, 500, 62, 500, 106, 448, 106])
+        self._status_beacon(phase, accent)
+        self._progress_rail(phase, accent)
+        self._pipe([0, 92, 48, 92, 48, 116, 96, 116])
+        self._pipe([640, 92, 600, 92, 600, 118, 576, 118])
 
-        # static environment
-        self._machine(20, 232, "#5f738a", False)
-        self._machine(458, 228, accent, phase in {"execute", "verify"})
-        self._scanner(78, 82, accent, phase == "analyze")
-        self._route_gate(232, 82, accent, phase == "route")
-        self._machine(338, 74, accent, phase == "execute")
-        self._verify_gate(462, 128, phase == "verify", phase == "complete")
-        self._conveyor(128, 166, 472, 208, phase in {"route", "execute", "verify"})
+        self._analyze_station(phase == "analyze", accent)
+        self._plan_station(phase == "plan", accent)
+        self._work_station(phase == "work", accent)
+        self._verify_station(phase == "verify", phase == "complete", accent)
+        self._conveyor(phase in {"plan", "work", "verify"}, accent)
+        self._workers(phase, accent)
 
-        # workers move around phase-relevant stations
-        positions = {
-            "analyze": ((105, 126), (154, 226), (398, 230)),
-            "judge": ((160, 126), (210, 222), (400, 230)),
-            "route": ((236, 128), (285, 220), (405, 228)),
-            "execute": ((342, 124), (410, 150), (430, 230)),
-            "verify": ((460, 126), (430, 220), (500, 222)),
-            "complete": ((245, 232), (314, 230), (425, 230)),
-            "failed": ((232, 230), (318, 230), (424, 230)),
-        }
-        for i, (x, y) in enumerate(positions.get(phase, positions["analyze"])):
-            carry = phase in {"route", "execute"} and i == 1
-            self._worker(x, y, facing=1 if i != 2 else -1, carry=carry, accent="#f29b43" if i != 2 else "#56a7e8")
-
-        cx, cy = self._task_progress(phase, accent)
         if phase not in {"complete", "failed"}:
-            self._cube(cx, cy, accent)
+            cx, cy = self._task_position(phase)
+            self._task_block(cx, cy, accent)
 
         self._activity_particles(phase, activity, accent)
-        self._status_lights(model, status)
-
-        # Minimal visual gauges: five stage blocks, no prose log.
-        stage_order = ["analyze", "judge", "route", "execute", "verify"]
-        effective_phase = "verify" if phase == "complete" else phase
-        active_index = stage_order.index(effective_phase) if effective_phase in stage_order else 0
-        for i in range(5):
-            x = 176 + i * 42
-            fill = accent if i <= active_index else "#334459"
-            if i == 1 and not bool((state or {}).get("judgement")):
-                fill = "#263445"
-            self._rect(x, 24, x + 26, 32, fill, "#0b1119", 1)
 
         if phase == "complete":
             self._complete_overlay(True)
@@ -423,10 +464,10 @@ class PixelFactory:
     def _draw_failure_fallback(self) -> None:
         try:
             self.canvas.delete("all")
-            self._rect(0, 0, self.WIDTH, self.HEIGHT, "#192332")
-            self._rect(182, 86, 378, 244, "#101820", "#ff6f7a", 4)
-            self.canvas.create_line(232, 126, 328, 204, fill="#ff6f7a", width=10)
-            self.canvas.create_line(328, 126, 232, 204, fill="#ff6f7a", width=10)
+            self._rect(0, 0, self.WIDTH, self.HEIGHT, "#172334")
+            self._rect(198, 92, 442, 258, "#101820", "#ff6f7a", 4)
+            self.canvas.create_line(252, 132, 388, 218, fill="#ff6f7a", width=10)
+            self.canvas.create_line(388, 132, 252, 218, fill="#ff6f7a", width=10)
         except Exception:
             pass
 
@@ -441,8 +482,8 @@ class PixelFactory:
             self._record_visual_error(exc)
             self._draw_failure_fallback()
             phase = "failed"
-        self.frame += 1
 
+        self.frame += 1
         if phase in {"complete", "failed"}:
             if self.terminal_since is None:
                 self.terminal_since = time.monotonic()
@@ -452,7 +493,7 @@ class PixelFactory:
         else:
             self.terminal_since = None
 
-        self.root.after(90, self.tick)
+        self.root.after(85, self.tick)
 
     def run(self) -> None:
         self.root.after(0, self.tick)
@@ -460,7 +501,7 @@ class PixelFactory:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Pixel-art live task visualizer for Codex Usage Guard")
+    parser = argparse.ArgumentParser(description="Live pixel-art task visualizer for Codex Usage Guard")
     parser.add_argument("--task-id", required=True)
     parser.add_argument("--no-topmost", action="store_true")
     parser.add_argument("--auto-close-seconds", type=float, default=3.5)
