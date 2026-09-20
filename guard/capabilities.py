@@ -19,6 +19,9 @@ def recommend_skill_refs(task: str, profile: RepoProfile, task_kind: str) -> lis
     ui_words = (
         "ui", "ux", "frontend", "layout", "responsive", "dashboard", "form",
         "landing page", "component", "css", "tailwind", "accessibility",
+        "redesign", "design", "polish", "visual", "typography", "spacing",
+        "alignment", "mobile", "navbar", "navigation", "hero", "modal",
+        "dropdown", "sidebar", "color", "theme", "animation", "motion",
     )
     architecture_words = (
         "architecture", "system design", "schema", "database", "api", "service",
@@ -29,7 +32,9 @@ def recommend_skill_refs(task: str, profile: RepoProfile, task_kind: str) -> lis
         "responsive", "layout", "form", "frontend",
     )
 
-    if task_kind == "ui" or any(_has(text, word) for word in ui_words):
+    ui_relevant = task_kind == "ui" or any(_has(text, word) for word in ui_words)
+
+    if ui_relevant:
         refs.append("references/ui-ux.md")
 
     if task_kind in {"database", "security", "refactor"} or any(
@@ -38,7 +43,7 @@ def recommend_skill_refs(task: str, profile: RepoProfile, task_kind: str) -> lis
         refs.append("references/system-design.md")
 
     if (
-        task_kind == "ui"
+        ui_relevant
         and any(_has(text, word) for word in browser_words)
         and "references/browser-verification.md" not in refs
     ):
