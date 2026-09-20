@@ -11,6 +11,18 @@ from .repo import inspect_repo
 
 UI_EXTENSIONS = {".css", ".scss", ".sass", ".less", ".html", ".htm", ".jsx", ".tsx", ".js", ".ts", ".vue", ".svelte"}
 
+HIGH_AMBITION_TERMS = (
+    "eye-catching", "eye catching", "premium", "luxury", "editorial", "distinctive",
+    "unique", "polished", "memorable", "fashion", "brand-forward", "high-end",
+    "high end", "world class", "beautiful", "stunning", "visual identity",
+    "not generic", "not like a generic", "best-looking", "best looking",
+)
+
+BRAND_SURFACE_TERMS = (
+    "landing page", "homepage", "campaign", "portfolio", "launch page", "marketing",
+    "brand", "hero", "website",
+)
+
 @dataclass(frozen=True)
 class UIFinding:
     severity: str
@@ -95,6 +107,60 @@ def _read_package(root: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8", errors="replace"))
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def design_brief(task: str, repo_path: str | Path = ".") -> dict[str, Any]:
+    """Return deterministic UI art-direction constraints before implementation."""
+    context = inspect_ui_context(repo_path)
+    text = " ".join(task.lower().split())
+    high_ambition = any(term in text for term in HIGH_AMBITION_TERMS)
+    surface = "brand-marketing" if any(term in text for term in BRAND_SURFACE_TERMS) else "product-ui"
+
+    if high_ambition:
+        critique_passes = 2
+        bar = "design-grade"
+        direction = (
+            "Create a deliberate visual concept before coding. The result must have a recognizable "
+            "composition, typographic hierarchy, and product-specific identity rather than a default SaaS shell."
+        )
+    else:
+        critique_passes = 1
+        bar = "production"
+        direction = (
+            "Preserve or establish a coherent product design system and make the primary workflow clear, "
+            "responsive, accessible, and visually intentional."
+        )
+
+    return {
+        "surface": surface,
+        "visual_ambition": bar,
+        "rendered_critique_passes": critique_passes,
+        "browser_visual_review_required": True,
+        "source_audit_is_not_visual_approval": True,
+        "direction": direction,
+        "must_define_before_coding": [
+            "primary user and primary action",
+            "visual concept in one sentence",
+            "layout/composition rule",
+            "typography roles",
+            "color roles and accent restraint",
+            "density/spacing rhythm",
+            "signature detail that makes the interface product-specific",
+        ],
+        "rendered_review_dimensions": [
+            "first-viewport hierarchy",
+            "composition and balance",
+            "typographic character",
+            "spacing rhythm",
+            "color/material coherence",
+            "control craft and states",
+            "responsive recomposition",
+            "product-specific identity",
+            "accessibility and focus",
+        ],
+        "anti_default_shell": high_ambition,
+        "ui_context": context,
+    }
 
 
 def inspect_ui_context(repo_path: str | Path = ".") -> dict[str, Any]:
@@ -230,4 +296,11 @@ def audit_ui(repo_path: str | Path = ".", *, max_files: int = 200) -> dict[str, 
         "counts": counts,
         "findings": [item.to_dict() for item in findings],
         "passes_strict_gate": counts["blocker"] == 0 and counts["important"] == 0,
+        "source_quality_only": True,
+        "visual_review_required": True,
+        "visual_quality_approved": None,
+        "visual_quality_note": (
+            "This deterministic source audit checks implementation hygiene and common UI anti-patterns. "
+            "It cannot approve aesthetic quality; rendered visual critique is still required."
+        ),
     }
