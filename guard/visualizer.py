@@ -8,12 +8,14 @@ import random
 import subprocess
 import sys
 import time
+import traceback
 from pathlib import Path
 from typing import Any
 
 
 DATA_ROOT = Path.home() / ".codex-usage-guard-data"
 TASKS_ROOT = DATA_ROOT / "tasks"
+VISUALIZER_LOG = DATA_ROOT / "visualizer.log"
 
 
 def task_path(task_id: str) -> Path:
@@ -192,8 +194,8 @@ class PixelFactory:
                 self._rect(x + 2, y + 2, x + tile - 2, y + tile - 2, "#1c2838")
 
     def _pipe(self, points: list[int]) -> None:
-        self.canvas.create_line(*points, fill="#0c1119", width=14, jointstyle="miter")
-        self.canvas.create_line(*points, fill="#344257", width=8, jointstyle="miter")
+        self.canvas.create_line(*points, fill="#0c1119", width=14, joinstyle="miter")
+        self.canvas.create_line(*points, fill="#344257", width=8, joinstyle="miter")
         for i in range(0, len(points) - 2, 2):
             x, y = points[i], points[i + 1]
             self.canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill="#53657d", outline="#0c1119")
@@ -408,12 +410,37 @@ class PixelFactory:
         elif phase == "failed":
             self._complete_overlay(False)
 
+    def _record_visual_error(self, exc: BaseException) -> None:
+        try:
+            VISUALIZER_LOG.parent.mkdir(parents=True, exist_ok=True)
+            with VISUALIZER_LOG.open("a", encoding="utf-8") as handle:
+                handle.write(f"task={self.task_id}\n")
+                handle.write("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+                handle.write("\n")
+        except OSError:
+            pass
+
+    def _draw_failure_fallback(self) -> None:
+        try:
+            self.canvas.delete("all")
+            self._rect(0, 0, self.WIDTH, self.HEIGHT, "#192332")
+            self._rect(182, 86, 378, 244, "#101820", "#ff6f7a", 4)
+            self.canvas.create_line(232, 126, 328, 204, fill="#ff6f7a", width=10)
+            self.canvas.create_line(328, 126, 232, 204, fill="#ff6f7a", width=10)
+        except Exception:
+            pass
+
     def tick(self) -> None:
         state = load_task(self.task_id)
         if state is not None:
             self.last_state = state
         phase = phase_from_state(self.last_state)
-        self.draw(self.last_state)
+        try:
+            self.draw(self.last_state)
+        except Exception as exc:
+            self._record_visual_error(exc)
+            self._draw_failure_fallback()
+            phase = "failed"
         self.frame += 1
 
         if phase in {"complete", "failed"}:
