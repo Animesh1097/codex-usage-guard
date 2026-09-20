@@ -9,11 +9,14 @@ Codex Usage Guard is a local developer tool that influences how Codex gathers co
 - stores task state and telemetry under `~/.codex-usage-guard-data`
 - installs a Codex Skill and custom agent profiles
 - filters text output produced by tools
-- can launch one pinned `codex exec` worker when the active coordinator route does not match the selected model/reasoning
+- keeps normal `$usage-guard` work in the user's current Codex session
+- can launch one pinned `codex exec` worker only when the user explicitly opts into the advanced routing path
 
-The pinned worker uses Codex's `workspace-write` sandbox and non-interactive `approval_policy="never"`. Usage Guard never enables Codex's dangerous approval/sandbox bypass flag. Commands that require permissions outside the worker sandbox should fail rather than silently bypass the sandbox.
+Normal Usage Guard operation does not change the user's model or reasoning mode.
 
-The guard does not read or copy Codex authentication files or hidden session credentials. The pinned worker relies on the existing Codex installation and sign-in. Parent `CODEX_THREAD_ID` and `CODEX_USAGE_GUARD_*` environment values are removed before the worker is launched so worker routing is not confused with the coordinator task context.
+For the optional advanced pinned-worker path, Codex's `workspace-write` sandbox and non-interactive `approval_policy="never"` are used. Usage Guard never enables Codex's dangerous approval/sandbox bypass flag. Commands that require permissions outside the worker sandbox should fail rather than silently bypass the sandbox.
+
+The guard does not read or copy Codex authentication files or hidden session credentials. The optional pinned worker relies on the existing Codex installation and sign-in. Parent `CODEX_THREAD_ID` and `CODEX_USAGE_GUARD_*` environment values are removed before an advanced worker is launched so worker routing is not confused with the coordinator task context.
 
 ## Reporting a vulnerability
 
