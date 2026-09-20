@@ -88,21 +88,23 @@ def _global_token_total(home: Path) -> int | None:
             pass
 
 
-def _latest_rate_limits(home: Path) -> dict[str, Any] | None:
+def _rollout_files(home: Path, thread_id: str | None = None) -> list[Path]:
     sessions = home / "sessions"
     if not sessions.exists():
-        return None
-
+        return []
+    pattern = f"*{thread_id}*.jsonl" if thread_id and not thread_id.startswith("__usage_guard_") else "rollout-*.jsonl"
     try:
-        files = sorted(
-            sessions.rglob("rollout-*.jsonl"),
+        return sorted(
+            sessions.rglob(pattern),
             key=lambda path: path.stat().st_mtime,
             reverse=True,
         )
     except OSError:
-        return None
+        return []
 
-    for path in files[:12]:
+
+def _latest_token_event(home: Path, thread_id: str | None = None) -> dict[str, Any] | None:
+    for path in _rollout_files(home, thread_id)[:12]:
         latest: dict[str, Any] | None = None
         try:
             with path.open("r", encoding="utf-8", errors="replace") as handle:
@@ -111,19 +113,35 @@ def _latest_rate_limits(home: Path) -> dict[str, Any] | None:
                         obj = json.loads(line)
                     except json.JSONDecodeError:
                         continue
-                    if obj.get("type") != "event_msg":
-                        continue
-                    payload = obj.get("payload", {})
-                    if payload.get("type") != "token_count":
-                        continue
-                    limits = payload.get("rate_limits")
-                    if isinstance(limits, dict):
-                        latest = limits
+                    if obj.get("type") == "event_msg" and obj.get("payload", {}).get("type") == "token_count":
+                        latest = obj["payload"]
         except OSError:
             continue
         if latest is not None:
             return latest
     return None
+
+
+def _latest_rate_limits(home: Path, thread_id: str | None = None) -> dict[str, Any] | None:
+    event = _latest_token_event(home, thread_id)
+    limits = event.get("rate_limits") if isinstance(event, dict) else None
+    return limits if isinstance(limits, dict) else None
+
+
+def _token_breakdown(home: Path, thread_id: str | None = None) -> dict[str, Any] | None:
+    event = _latest_token_event(home, thread_id)
+    info = event.get("info") if isinstance(event, dict) else None
+    total = info.get("total_token_usage") if isinstance(info, dict) else None
+    if not isinstance(total, dict):
+        return None
+    return {
+        "input_tokens": total.get("input_tokens"),
+        "cached_input_tokens": total.get("cached_input_tokens"),
+        "output_tokens": total.get("output_tokens"),
+        "reasoning_output_tokens": total.get("reasoning_output_tokens"),
+        "total_tokens": total.get("total_tokens"),
+        "model_context_window": info.get("model_context_window"),
+    }
 
 
 def _window(limits: dict[str, Any] | None, key: str) -> dict[str, Any] | None:
@@ -149,14 +167,15 @@ def usage_snapshot(
     home = home or codex_home()
     requested_thread = thread_id or os.environ.get("CODEX_THREAD_ID")
     row = _read_thread(home=home, thread_id=requested_thread, repo_root=repo_root)
-    limits = _latest_rate_limits(home)
-
     actual_thread = str(row.get("id")) if row else requested_thread
+    limits = _latest_rate_limits(home, actual_thread)
+    breakdown = _token_breakdown(home, actual_thread)
     return {
         "available": bool(row or limits),
         "thread_id": actual_thread,
         "tokens_total": int(row.get("tokens_used", 0)) if row else None,
         "tokens_global_total": _global_token_total(home),
+        "token_breakdown": breakdown,
         "model": row.get("model") if row else None,
         "cwd": row.get("cwd") if row else repo_root,
         "source_db": row.get("db") if row else None,
@@ -197,10 +216,25 @@ def usage_delta(baseline: dict[str, Any] | None, current: dict[str, Any] | None)
             return round(float(a) - float(b), 3)
         return None
 
+    breakdown_delta: dict[str, int] | None = None
+    if same_thread:
+        b_break = baseline.get("token_breakdown")
+        a_break = current.get("token_breakdown")
+        if isinstance(b_break, dict) and isinstance(a_break, dict):
+            keys = ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens", "total_tokens")
+            values: dict[str, int] = {}
+            for key in keys:
+                b_value = b_break.get(key)
+                a_value = a_break.get(key)
+                if isinstance(b_value, int) and isinstance(a_value, int):
+                    values[key] = max(0, a_value - b_value)
+            breakdown_delta = values or None
+
     return {
         "same_thread": same_thread,
         "tokens_delta": token_delta,
         "token_delta_scope": token_scope,
+        "token_breakdown_delta": breakdown_delta,
         "primary_used_percent_delta": pct_delta("primary"),
         "secondary_used_percent_delta": pct_delta("secondary"),
     }
