@@ -73,27 +73,34 @@ If the model-turn budget is exhausted, continue only with deterministic checks t
 
 For UI-relevant tasks, load `references/ui-ux.md` and, when selected, `references/browser-verification.md`.
 
-Before editing:
+Before editing, inspect the incumbent UI system **and** derive the visual-quality bar:
 
     & "$HOME\.codex-usage-guard\guard.cmd" ui-context --repo .
+    & "$HOME\.codex-usage-guard\guard.cmd" ui-brief --task "<USER_OBJECTIVE>" --repo .
+
+If `ui-brief` returns `visual_ambition: design-grade`, do not begin implementation until the visual concept, composition rule, typography roles, color/material roles, density rhythm, and one signature product-specific detail are explicit.
 
 After editing:
 
     & "$HOME\.codex-usage-guard\guard.cmd" ui-audit --repo . --strict --json
 
+The deterministic audit is **source-code hygiene only**. It can detect implementation/accessibility anti-patterns, but it cannot certify that the rendered UI is beautiful, distinctive, or visually resolved.
+
 The expected UI loop is:
 
 1. inspect the incumbent design system
-2. shape hierarchy and primary action
-3. implement the smallest complete change
-4. run deterministic UI audit
-5. run detected project checks
-6. render the changed flow in a browser when available
-7. critique hierarchy, spacing, typography, states, responsiveness, clipping, and accessibility
-8. make one targeted polish pass
-9. review the final diff
+2. derive `ui-brief` and set the production vs design-grade bar
+3. shape visual concept, hierarchy, composition, typography, and primary action
+4. implement the smallest complete change
+5. run deterministic UI audit
+6. run detected project checks
+7. render the changed flow in a browser when available
+8. critique composition, hierarchy, typography, spacing, color/material coherence, controls/states, responsiveness, product identity, clipping, and accessibility
+9. fix the largest visual defects first
+10. for design-grade work, re-render and perform a **second aesthetic critique pass**
+11. review the final diff
 
-A passing build is not enough proof for UI work.
+A passing build or passing `ui-audit` is not enough proof for UI work. If rendered browser/screenshot evidence is unavailable, explicitly report that aesthetic quality was not visually verified.
 
 ## Live visualizer
 
