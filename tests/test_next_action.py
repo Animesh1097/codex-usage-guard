@@ -40,6 +40,17 @@ class NextActionTests(unittest.TestCase):
         )
         self.assertEqual(result.action, "reassess_or_escalate")
 
+    def test_ui_uses_browser_verification_when_available(self):
+        result = predict_next_action(
+            task_kind="ui",
+            changed_files=2,
+            test_status="pass",
+            build_status="pass",
+            browser_available=True,
+            browser_status="not-run",
+        )
+        self.assertEqual(result.action, "browser_verify")
+
     def test_stops_after_verified_general_change(self):
         result = predict_next_action(
             task_kind="general",
