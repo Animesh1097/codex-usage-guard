@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,6 +9,7 @@ from typing import Any
 
 from .budget import assert_action_allowed, budget_status
 from .repo import RepoProfile, changed_file_hashes
+from .usage import usage_delta, usage_snapshot
 
 
 DATA_ROOT = Path.home() / ".codex-usage-guard-data"
@@ -24,8 +26,13 @@ def _task_path(task_id: str, root: Path = TASKS_ROOT) -> Path:
 
 def start_task(task: str, plan: dict[str, Any], repo: RepoProfile, *, root: Path = TASKS_ROOT) -> dict[str, Any]:
     task_id = uuid.uuid4().hex[:12]
+    active_thread = os.environ.get("CODEX_THREAD_ID")
+    baseline_usage = usage_snapshot(
+        thread_id=active_thread or "__usage_guard_pending_thread__",
+        repo_root=repo.root if active_thread else None,
+    )
     state = {
-        "version": 2,
+        "version": 3,
         "task_id": task_id,
         "objective": task,
         "repo_root": repo.root,
@@ -39,6 +46,11 @@ def start_task(task: str, plan: dict[str, Any], repo: RepoProfile, *, root: Path
         "events": [],
         "completed": [],
         "unresolved": [],
+        "usage": {
+            "baseline": baseline_usage,
+            "finish": None,
+            "delta": None,
+        },
     }
     path = _task_path(task_id, root)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -51,6 +63,28 @@ def load_task(task_id: str, *, root: Path = TASKS_ROOT) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"unknown task id: {task_id}")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def latest_active_task_id(repo_root: str | None = None, *, root: Path = TASKS_ROOT) -> str | None:
+    if not root.exists():
+        return None
+    try:
+        paths = sorted(root.glob("*.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+    except OSError:
+        return None
+    for path in paths:
+        try:
+            state = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if state.get("status") != "active":
+            continue
+        if repo_root is not None and state.get("repo_root") != repo_root:
+            continue
+        task_id = state.get("task_id")
+        if isinstance(task_id, str) and task_id:
+            return task_id
+    return None
 
 
 def save_task(state: dict[str, Any], *, root: Path = TASKS_ROOT) -> None:
@@ -104,5 +138,16 @@ def record_action(
 def finish_task(task_id: str, *, status: str = "completed", root: Path = TASKS_ROOT) -> dict[str, Any]:
     state = load_task(task_id, root=root)
     state["status"] = status
+    baseline = (state.get("usage") or {}).get("baseline", {})
+    baseline_thread = baseline.get("thread_id")
+    if baseline_thread == "__usage_guard_pending_thread__":
+        baseline_thread = None
+    current = usage_snapshot(
+        thread_id=os.environ.get("CODEX_THREAD_ID") or baseline_thread,
+        repo_root=state.get("repo_root"),
+    )
+    usage = state.setdefault("usage", {})
+    usage["finish"] = current
+    usage["delta"] = usage_delta(usage.get("baseline"), current)
     save_task(state, root=root)
     return state

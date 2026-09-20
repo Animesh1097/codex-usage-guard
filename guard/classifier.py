@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .capabilities import recommend_skill_refs
 from .models import GuardPlan
 from .repo import RepoProfile, inspect_repo
 
@@ -234,5 +235,6 @@ def classify_task(task: str, repo_path: str | Path = ".") -> GuardPlan:
         requires_lint=requires_lint,
         predicted_steps=_steps_for(kind, profile, complexity, risk),
         repo_signals=profile.signals,
+        skill_refs=tuple(recommend_skill_refs(task, profile, kind)),
         reasons=tuple(reasons[:12]),
     )

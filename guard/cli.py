@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 from . import __version__
+from .action_space import build_action_space
 from .budget import budget_status
 from .classifier import classify_task
 from .compressor import compress, estimate_tokens
@@ -15,8 +17,9 @@ from .context import make_capsule
 from .launcher import prepare_launch, preview_launch, resolve_launch_input, run_codex
 from .next_action import predict_next_action
 from .repo import inspect_repo
-from .state import finish_task, load_task, record_action, start_task
+from .state import finish_task, latest_active_task_id, load_task, record_action, start_task
 from .telemetry import aggregate, record_compression, record_task_summary
+from .usage import usage_delta, usage_snapshot
 
 
 def _json(data: object) -> None:
@@ -70,6 +73,7 @@ def cmd_start(args: argparse.Namespace) -> int:
             "plan": state["plan"],
             "repo": state["repo"],
             "budget": budget_status(state),
+            "usage_before": (state.get("usage") or {}).get("baseline"),
         }
     )
     return 0
@@ -98,6 +102,59 @@ def cmd_budget(args: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_active_task_id(task_id: str | None, repo: str) -> str:
+    if task_id:
+        return task_id
+    profile = inspect_repo(repo)
+    resolved = latest_active_task_id(profile.root)
+    if not resolved:
+        raise FileNotFoundError(f"no active guarded task found for {profile.root}")
+    return resolved
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    task_id = _resolve_active_task_id(args.task_id, args.repo)
+    state = load_task(task_id)
+    baseline = (state.get("usage") or {}).get("baseline") or {}
+    current = usage_snapshot(
+        thread_id=os.environ.get("CODEX_THREAD_ID") or baseline.get("thread_id"),
+        repo_root=state.get("repo_root"),
+    )
+    _json(
+        {
+            "task_id": task_id,
+            "status": state.get("status"),
+            "objective": state.get("objective"),
+            "repo_root": state.get("repo_root"),
+            "route": {
+                "profile": state.get("plan", {}).get("agent_profile"),
+                "model": state.get("plan", {}).get("preferred_model"),
+                "reasoning_effort": state.get("plan", {}).get("reasoning_effort"),
+            },
+            "budget": budget_status(state),
+            "usage": {
+                "before": baseline,
+                "current": current,
+                "delta": usage_delta(baseline, current),
+            },
+            "verification": {
+                "test": state.get("repo", {}).get("test_command"),
+                "build": state.get("repo", {}).get("build_command"),
+                "lint": state.get("repo", {}).get("lint_command"),
+                "typecheck": state.get("repo", {}).get("typecheck_command"),
+            },
+            "skill_refs": state.get("plan", {}).get("skill_refs", []),
+        }
+    )
+    return 0
+
+
+def cmd_usage(args: argparse.Namespace) -> int:
+    profile = inspect_repo(args.repo)
+    _json(usage_snapshot(repo_root=profile.root))
+    return 0
+
+
 def cmd_finish(args: argparse.Namespace) -> int:
     state = finish_task(args.task_id, status=args.status)
     record_task_summary(
@@ -111,6 +168,7 @@ def cmd_finish(args: argparse.Namespace) -> int:
             "status": args.status,
             "budget": budget_status(state),
             "compression": aggregate(task_id=args.task_id),
+            "usage": state.get("usage"),
         }
     )
     return 0
@@ -157,6 +215,8 @@ def cmd_next(args: argparse.Namespace) -> int:
         risk = 1
 
     changed_files = args.changed_files if args.changed_files is not None else len(profile.changed_files)
+    browser_available = shutil.which("browser-harness") is not None
+    production_check_required = args.production_check_required or (kind == "deployment" and risk >= 5)
     action = predict_next_action(
         task_kind=kind,
         changed_files=changed_files,
@@ -164,14 +224,16 @@ def cmd_next(args: argparse.Namespace) -> int:
         build_status=args.build_status,
         lint_status=args.lint_status,
         typecheck_status=args.typecheck_status,
+        browser_status=args.browser_status,
         diff_reviewed=args.diff_reviewed,
-        production_check_required=args.production_check_required or (kind == "deployment" and risk >= 5),
+        production_check_required=production_check_required,
         attempts=retries,
         max_retries=max_retries,
         tests_available=bool(profile.test_command),
         build_available=bool(profile.build_command),
         lint_available=bool(profile.lint_command),
         typecheck_available=bool(profile.typecheck_command),
+        browser_available=browser_available,
         docs_only=profile.docs_only,
         sensitive_change=bool(profile.sensitive_files),
         budget_exhausted=budget_exhausted,
@@ -182,7 +244,25 @@ def cmd_next(args: argparse.Namespace) -> int:
         "build": profile.build_command,
         "lint": profile.lint_command,
         "typecheck": profile.typecheck_command,
+        "browser_harness": "browser-harness" if browser_available else None,
     }
+    data["action_space"] = build_action_space(
+        task_kind=kind,
+        changed_files=changed_files,
+        test_status=args.test_status,
+        build_status=args.build_status,
+        lint_status=args.lint_status,
+        typecheck_status=args.typecheck_status,
+        browser_status=args.browser_status,
+        diff_reviewed=args.diff_reviewed,
+        tests_available=bool(profile.test_command),
+        build_available=bool(profile.build_command),
+        lint_available=bool(profile.lint_command),
+        typecheck_available=bool(profile.typecheck_command),
+        browser_available=browser_available,
+        docs_only=profile.docs_only,
+        production_check_required=production_check_required,
+    )
     if state:
         data["budget"] = budget_status(state)
     _json(data)
@@ -234,12 +314,15 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     python_ok = sys.version_info >= (3, 10)
     git_version = _command_version("git")
     codex_version = _command_version("codex")
+    browser_harness_version = _command_version("browser-harness")
     checks = {
         "usage_guard_version": __version__,
         "python": sys.version.split()[0],
         "python_supported": python_ok,
         "git": git_version,
         "codex": codex_version,
+        "browser_harness": browser_harness_version,
+        "browser_use_cloud_configured": bool(os.environ.get("BROWSER_USE_API_KEY")),
         "ready": bool(python_ok and git_version and codex_version),
     }
     _json(checks)
@@ -286,6 +369,15 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--task-id", required=True)
     b.set_defaults(func=cmd_budget)
 
+    status = sub.add_parser("status", help="show route, budget, verification, and before/after Codex usage")
+    status.add_argument("--task-id")
+    status.add_argument("--repo", default=".")
+    status.set_defaults(func=cmd_status)
+
+    usage = sub.add_parser("usage", help="read current Codex token/rate-limit telemetry locally")
+    usage.add_argument("--repo", default=".")
+    usage.set_defaults(func=cmd_usage)
+
     fn = sub.add_parser("finish", help="close a guarded task and write summary telemetry")
     fn.add_argument("--task-id", required=True)
     fn.add_argument("--status", choices=("completed", "blocked", "abandoned"), default="completed")
@@ -308,6 +400,7 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("--build-status", choices=("not-run", "pass", "fail", "not-needed"), default="not-run")
     n.add_argument("--lint-status", choices=("not-run", "pass", "fail", "not-needed"), default="not-run")
     n.add_argument("--typecheck-status", choices=("not-run", "pass", "fail", "not-needed"), default="not-run")
+    n.add_argument("--browser-status", choices=("not-run", "pass", "fail", "not-needed"), default="not-run")
     n.add_argument("--diff-reviewed", action="store_true")
     n.add_argument("--production-check-required", action="store_true")
     n.add_argument("--attempts", type=int, default=0)

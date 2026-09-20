@@ -90,9 +90,10 @@ if ($LASTEXITCODE -ne 0) { throw "Usage Guard doctor failed." }
 $Version = (& $Launcher version).Trim()
 Write-Host ""
 Write-Host "Codex Usage Guard $Version installed." -ForegroundColor Green
-Write-Host "Recommended: run cguard from any project folder."
-Write-Host "  cguard `"fix the seller form`""
-Write-Host "Or choose a project explicitly:"
-Write-Host "  cguard `"C:\path\to\project`" `"fix the seller form`""
-Write-Host "The existing `$usage-guard <task> Skill remains available inside Codex."
+Write-Host "Recommended after this one-time install: work inside Codex."
+Write-Host "  `$usage-guard <task>"
+Write-Host "  `$usage-guard status"
+Write-Host "  `$usage-guard usage"
+Write-Host "Optional parent-model pre-routing remains available with cguard."
 Write-Host "No API key or Ollama is required. It uses your existing Codex sign-in."
+Write-Host "Browser Harness / Browser Use Cloud are optional and not required by the core guard."

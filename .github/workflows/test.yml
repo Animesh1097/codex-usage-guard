@@ -27,6 +27,7 @@ jobs:
           python scripts/guard_cli.py version
           python scripts/guard_cli.py plan --task "change the footer phone number" --repo .
           python scripts/guard_cli.py inspect --repo .
+          python scripts/guard_cli.py usage --repo .
           python scripts/guard_cli.py launch --dry-run --repo . "change the footer phone number"
       - name: Parse PowerShell scripts
         if: runner.os == 'Windows'

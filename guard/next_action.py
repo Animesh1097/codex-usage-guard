@@ -11,6 +11,7 @@ def predict_next_action(
     build_status: str = "not-run",
     lint_status: str = "not-run",
     typecheck_status: str = "not-run",
+    browser_status: str = "not-run",
     diff_reviewed: bool = False,
     production_check_required: bool = False,
     attempts: int = 0,
@@ -19,6 +20,7 @@ def predict_next_action(
     build_available: bool = False,
     lint_available: bool = False,
     typecheck_available: bool = False,
+    browser_available: bool = False,
     docs_only: bool = False,
     sensitive_change: bool = False,
     budget_exhausted: bool = False,
@@ -64,6 +66,9 @@ def predict_next_action(
 
     if lint_available and lint_status == "not-run" and (changed_files >= 4 or sensitive_change):
         return NextAction("run_lint", "lint is a low-cost verification step for a broad or sensitive change")
+
+    if browser_available and task_kind == "ui" and browser_status == "not-run":
+        return NextAction("browser_verify", "real rendered behavior is stronger evidence for UI work than another reasoning turn")
 
     if not diff_reviewed:
         return NextAction("review_git_diff", "verify scope and accidental edits before spending more model usage")

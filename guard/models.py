@@ -25,11 +25,12 @@ class GuardPlan:
     context_mode: str = "hot-warm-cold"
     predicted_steps: tuple[str, ...] = field(default_factory=tuple)
     repo_signals: tuple[str, ...] = field(default_factory=tuple)
+    skill_refs: tuple[str, ...] = field(default_factory=tuple)
     reasons: tuple[str, ...] = field(default_factory=tuple)
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
-        for key in ("predicted_steps", "repo_signals", "reasons"):
+        for key in ("predicted_steps", "repo_signals", "skill_refs", "reasons"):
             data[key] = list(data[key])
         return data
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.0
+
+- make the in-Codex `$usage-guard` Skill the normal post-install workflow
+- add local `status` and `usage` commands with before/current/after Codex telemetry
+- track same-thread input, cached-input, output, reasoning, and total token deltas when available
+- add approximate global-token fallback for pre-session launches
+- include 5-hour and weekly rate-limit percentage deltas when present in local rollout telemetry
+- never read or forward Codex auth tokens
+- add task-aware UI/UX, system-design, and browser-verification references with progressive disclosure
+- add a small indexed next-action space inspired by structured fast-agent loops
+- optionally use an existing Browser Harness for UI verification
+- keep Browser Use Cloud optional and core Usage Guard zero-extra-key
+- retain `cguard` as the optional parent-model pre-session launcher
+- add third-party research and attribution notes
+
+
 ## 0.3.0
 
 - global `cguard` launcher for Windows
