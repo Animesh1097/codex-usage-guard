@@ -7,15 +7,17 @@ description: Reduce Codex usage on coding tasks by budgeting model turns, compre
 
 Treat the user's objective as the source of truth. Do not ask the user to choose a model, reasoning level, agent mode, or next step when the guard can decide.
 
-## Start every guarded task
+## Session entry
 
-On Windows:
+Preferred mode is the pre-session `cguard` launcher. When the environment variable `CODEX_USAGE_GUARD_TASK_ID` is present, the launcher already created the guarded task and started Codex with the selected repository, model, and reasoning effort. Reuse that task ID. Do not call `start` again and do not spawn a subagent merely to reproduce the already-selected route.
+
+For direct `$usage-guard` invocation inside an existing Codex session, start a task on Windows:
 
     & "$HOME\.codex-usage-guard\guard.cmd" start --task "<USER_OBJECTIVE>" --repo .
 
 Keep the returned `task_id`. The response contains the repo-aware plan, model profile, reasoning effort, hard action/model/retry budgets, and deterministic verification commands.
 
-Route the implementation to the selected custom agent profile when available. Give it only the objective, budget, compact state capsule, and minimum relevant repository evidence. If the selected profile/model is unavailable, keep the current Codex model but preserve the guard policy.
+Direct Skill mode can recommend a route but cannot reliably replace the already-running parent Codex model. Prefer `cguard` when automatic model switching matters.
 
 ## Work loop
 
