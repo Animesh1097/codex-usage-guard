@@ -4,11 +4,16 @@
 
 It does not replace Codex and it does not run another LLM. It adds deterministic local policy around Codex so model strength, reasoning effort, context, retries, verification, and subagents are used only when justified.
 
-> **v0.7 developer preview**. Usage Guard now adds a stronger UI quality engine on top of the visual HUD and verified execution routing. It still does not claim guaranteed allowance savings.
+> **v0.8 developer preview**. Usage Guard now adds a small graphical pixel-art task visualizer on top of the UI quality engine and verified execution routing. It still does not claim guaranteed allowance savings.
 
-## What v0.7 does
+## What v0.8 does
 
 - makes **`$usage-guard` inside Codex the normal workflow** after one-time installation
+- automatically opens a small graphical **pixel factory** while a guarded task is working when the desktop supports it
+- represents analyze → optional judge → route → execute → verify as a moving task cube through factory stations
+- animates workers, conveyors, routing lights, machinery, verification scanning, completion trophy/confetti, and failure state
+- derives the current scene from real guard/task state rather than displaying a made-up progress percentage
+- keeps terminal HUD behavior only as a fallback when a GUI cannot be opened or graphical visuals are disabled
 - adds a substantially stronger UI/UX craft policy for dashboards, forms, apps, landing pages, and redesign work
 - detects the repository's existing styling system, component libraries, token files, and CSS variables before UI editing
 - adds a deterministic zero-model `ui-audit` gate for common accessibility and generated-UI regressions
@@ -122,7 +127,35 @@ A coordinator status line can therefore still show Luna while the actual task ru
 
 When the task finishes, Usage Guard reports the measured token delta when available. If the task started in a new pre-session launcher and no same-thread baseline exists, it can fall back to an approximate global token delta; concurrent Codex sessions can make that fallback noisy.
 
-### UI quality engine
+### Live pixel factory
+
+For desktop sessions, a guarded task now opens a small always-on-top pixel-art window automatically while the task is active. It is intentionally a visual metaphor rather than a scrolling log.
+
+The scene uses:
+
+- a glowing cube for the active task
+- scanner/bench activity for analysis
+- a routing gate for model selection
+- conveyor/machinery/workers for implementation
+- a verification gate for tests/build/browser/diff checks
+- a trophy/confetti completion scene
+- a red failure scene when routing or guarded execution fails
+
+There is no fake percent-complete meter. The cube occupies the station corresponding to the guard's actual state and loops locally while that phase is still running.
+
+Model families are encoded with machine accents:
+
+- Luna: blue
+- Terra: green
+- GPT-5.6: gold
+
+The visualizer is implemented locally with the Python standard GUI toolkit and does not add a web service, API key, external UI package, or asset download. It reads the existing local task-state JSON. On headless or unsupported environments, Usage Guard falls back to the terminal HUD.
+
+The window normally closes a few seconds after the task is marked completed or failed. To disable the graphical visualizer:
+
+    CODEX_USAGE_GUARD_DISABLE_VISUAL=1
+
+
 
 For UI-relevant work, Usage Guard now gathers compact design context before editing:
 
