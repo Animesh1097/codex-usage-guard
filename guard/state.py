@@ -60,6 +60,28 @@ def load_task(task_id: str, *, root: Path = TASKS_ROOT) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def latest_active_task_id(repo_root: str | None = None, *, root: Path = TASKS_ROOT) -> str | None:
+    if not root.exists():
+        return None
+    try:
+        paths = sorted(root.glob("*.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+    except OSError:
+        return None
+    for path in paths:
+        try:
+            state = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if state.get("status") != "active":
+            continue
+        if repo_root is not None and state.get("repo_root") != repo_root:
+            continue
+        task_id = state.get("task_id")
+        if isinstance(task_id, str) and task_id:
+            return task_id
+    return None
+
+
 def save_task(state: dict[str, Any], *, root: Path = TASKS_ROOT) -> None:
     state["updated_at"] = _now()
     path = _task_path(str(state["task_id"]), root)
