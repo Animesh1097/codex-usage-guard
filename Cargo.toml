@@ -1,3 +1,4 @@
 [workspace]
 members = ["crates/usage-guard-core"]
+exclude = ["apps/visualizer/src-tauri"]
 resolver = "2"
