@@ -121,6 +121,20 @@ def cmd_status(args: argparse.Namespace) -> int:
         thread_id=os.environ.get("CODEX_THREAD_ID") or baseline.get("thread_id"),
         repo_root=state.get("repo_root"),
     )
+    enforcement = enforcement_status(state)
+    worker_usage = enforcement.get("worker_usage") if isinstance(enforcement, dict) else None
+    compact_enforcement = {
+        "status": enforcement.get("status"),
+        "requested_model": enforcement.get("requested_model"),
+        "requested_reasoning": enforcement.get("requested_reasoning"),
+        "coordinator_model": enforcement.get("coordinator_model"),
+        "coordinator_reasoning": enforcement.get("coordinator_reasoning"),
+        "effective_model": enforcement.get("effective_model"),
+        "effective_reasoning": enforcement.get("effective_reasoning"),
+        "worker_thread_id": enforcement.get("worker_thread_id"),
+        "worker_tokens_total": worker_usage.get("tokens_total") if isinstance(worker_usage, dict) else None,
+        "worker_token_breakdown": worker_usage.get("token_breakdown") if isinstance(worker_usage, dict) else None,
+    }
     _json(
         {
             "task_id": task_id,
@@ -132,7 +146,7 @@ def cmd_status(args: argparse.Namespace) -> int:
                 "model": state.get("plan", {}).get("preferred_model"),
                 "reasoning_effort": state.get("plan", {}).get("reasoning_effort"),
             },
-            "route_enforcement": enforcement_status(state),
+            "route_enforcement": compact_enforcement,
             "budget": budget_status(state),
             "usage": {
                 "before": baseline,
@@ -181,6 +195,7 @@ def cmd_finish(args: argparse.Namespace) -> int:
             "budget": budget_status(state),
             "compression": aggregate(task_id=args.task_id),
             "usage": state.get("usage"),
+            "route_enforcement": enforcement_status(state),
         }
     )
     return 0
