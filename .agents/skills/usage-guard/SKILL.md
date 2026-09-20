@@ -92,7 +92,16 @@ Compress noisy output before it re-enters model context:
     <DETECTED_TEST_COMMAND> 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type test --task-id <ID>
     git diff 2>&1 | & "$HOME\.codex-usage-guard\guard.cmd" compress --type git --task-id <ID>
 
-For UI work, if Browser Harness is already installed, prefer real-browser verification before declaring success. Browser Use Cloud is optional and must only be used when the user opted in and `BROWSER_USE_API_KEY` is already configured. Core Usage Guard must remain zero-extra-key.
+For UI-relevant work, the UI quality loop is mandatory when `references/ui-ux.md` was selected:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" ui-context --repo .
+    & "$HOME\.codex-usage-guard\guard.cmd" ui-audit --repo . --strict --json
+
+Use the first command to preserve the project's existing styling/component system. Treat blocker/important audit findings as defects unless the project clearly and intentionally requires them. The deterministic audit is a quality gate, not a substitute for visual judgement.
+
+After the source audit, if Browser Harness is already installed, prefer real-browser verification before declaring success. Check the changed path at desktop and narrow viewport sizes, then make one targeted polish pass for concrete defects. Browser Use Cloud is optional and must only be used when the user opted in and `BROWSER_USE_API_KEY` is already configured. Core Usage Guard must remain zero-extra-key.
+
+For UI work, a passing build is not enough. Do not finish until hierarchy, spacing, typography, responsive behavior, interaction states, and accessibility have been checked against the selected UI reference.
 
 ## Finish
 
