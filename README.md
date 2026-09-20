@@ -4,11 +4,16 @@
 
 It does not replace Codex and it does not run another LLM. It adds deterministic local policy around Codex so model strength, reasoning effort, context, retries, verification, and subagents are used only when justified.
 
-> **v0.6 developer preview**. Usage Guard now includes a compact visual Guard HUD on top of the v0.5 verified execution routing. It still does not claim guaranteed allowance savings.
+> **v0.7 developer preview**. Usage Guard now adds a stronger UI quality engine on top of the visual HUD and verified execution routing. It still does not claim guaranteed allowance savings.
 
-## What v0.6 does
+## What v0.7 does
 
 - makes **`$usage-guard` inside Codex the normal workflow** after one-time installation
+- adds a substantially stronger UI/UX craft policy for dashboards, forms, apps, landing pages, and redesign work
+- detects the repository's existing styling system, component libraries, token files, and CSS variables before UI editing
+- adds a deterministic zero-model `ui-audit` gate for common accessibility and generated-UI regressions
+- routes UI guidance for design/polish/responsive tasks even when the task is primarily classified as debugging
+- requires a UI loop of inspect → shape → implement → source audit → project checks → browser verify → critique → polish → diff review
 - adds a small animated **Guard HUD** so progress is visible without reading raw JSON
 - uses five visual stages: analyze → judge → route → execute → verify
 - skips the judge node visually until the adaptive judge is actually used
@@ -117,7 +122,23 @@ A coordinator status line can therefore still show Luna while the actual task ru
 
 When the task finishes, Usage Guard reports the measured token delta when available. If the task started in a new pre-session launcher and no same-thread baseline exists, it can fall back to an approximate global token delta; concurrent Codex sessions can make that fallback noisy.
 
-### Guard HUD
+### UI quality engine
+
+For UI-relevant work, Usage Guard now gathers compact design context before editing:
+
+    guard.cmd ui-context --repo .
+
+It detects the existing styling approach, component libraries, common token files, and CSS-variable usage so the worker is less likely to invent a second visual system.
+
+After editing, it runs:
+
+    guard.cmd ui-audit --repo . --strict --json
+
+The deterministic audit scans changed UI files first and flags high-signal problems such as non-semantic click targets, missing image alt text, removed focus indication, decorative gradient text, repeating stripe backgrounds, arbitrary giant z-index values, transition-all, bounce motion, oversized radii, heavy shadow + border combinations, and repeated uppercase/tracked eyebrow labels.
+
+This source audit is deliberately not treated as visual proof. UI work still needs rendered verification when browser tooling is available, including desktop and narrow layouts plus important interaction states. A passing build alone is not considered sufficient UI evidence.
+
+
 
 The default guarded execution view is deliberately small:
 
@@ -379,11 +400,11 @@ A same-thread token delta is the strongest measurement. When v0.5 uses a dedicat
 
 The core Skill uses progressive disclosure: a task gets at most two extra craft references.
 
-- `ui-ux.md`: visual hierarchy, states, accessibility, responsive behavior, anti-generic UI checks
+- `ui-ux.md`: product-vs-brand context, hierarchy, layout, typography, color, surfaces, states, accessibility, motion, responsive stress testing, anti-generic checks, and a required polish loop
 - `system-design.md`: boundaries, data ownership, retries, migrations, security and tradeoffs
 - `browser-verification.md`: real-browser evidence, small valid browser actions, independent DONE checks
 
-See [THIRD_PARTY_RESEARCH.md](THIRD_PARTY_RESEARCH.md) for the public projects that informed these patterns and their licenses.
+See [THIRD_PARTY_RESEARCH.md](THIRD_PARTY_RESEARCH.md) for the public projects that informed these patterns and their licenses. v0.7 specifically reviewed AI UX Playground's curated skill catalog plus Impeccable, Jakub Krehel's design skills, Taste Skill, and Vercel's Web Interface Guidelines. Usage Guard keeps its own compact original guidance instead of vendoring those skill packs.
 
 ## Offline benchmark
 
