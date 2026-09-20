@@ -56,6 +56,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Test Rust core
         run: cargo test -p usage-guard-core
+      - name: Smoke Rust core CLI
+        run: cargo run --quiet -p usage-guard-core --bin usage-guard-core -- policy 4 4
 
   visualizer-windows:
     runs-on: windows-latest
