@@ -27,6 +27,16 @@ class UsageTests(unittest.TestCase):
             "type": "event_msg",
             "payload": {
                 "type": "token_count",
+                "info": {
+                    "total_token_usage": {
+                        "input_tokens": 800,
+                        "cached_input_tokens": 400,
+                        "output_tokens": 150,
+                        "reasoning_output_tokens": 50,
+                        "total_tokens": 1000,
+                    },
+                    "model_context_window": 100000,
+                },
                 "rate_limits": {
                     "primary": {"used_percent": 20.0, "window_minutes": 300, "resets_at": 1},
                     "secondary": {"used_percent": 5.0, "window_minutes": 10080, "resets_at": 2},
@@ -34,7 +44,7 @@ class UsageTests(unittest.TestCase):
                 },
             },
         }
-        (sessions / "rollout-test.jsonl").write_text(json.dumps(payload) + "\n", encoding="utf-8")
+        (sessions / "rollout-thread-1.jsonl").write_text(json.dumps(payload) + "\n", encoding="utf-8")
         return td, home
 
     def test_snapshot_reads_thread_and_rate_limits_locally(self):
@@ -46,6 +56,8 @@ class UsageTests(unittest.TestCase):
             self.assertEqual(snap["model"], "gpt-test")
             self.assertEqual(snap["rate_limits"]["primary"]["used_percent"], 20.0)
             self.assertEqual(snap["rate_limits"]["secondary"]["window_minutes"], 10080)
+            self.assertEqual(snap["token_breakdown"]["cached_input_tokens"], 400)
+            self.assertEqual(snap["tokens_global_total"], 1000)
         finally:
             td.cleanup()
 
@@ -65,8 +77,15 @@ class UsageTests(unittest.TestCase):
         self.assertEqual(delta["primary_used_percent_delta"], 3.0)
         self.assertEqual(delta["secondary_used_percent_delta"], 1.0)
 
-        other = dict(after, thread_id="b")
-        self.assertIsNone(usage_delta(before, other)["tokens_delta"])
+        other = dict(
+            after,
+            thread_id="b",
+            tokens_global_total=800,
+        )
+        before_global = dict(before, tokens_global_total=500)
+        fallback = usage_delta(before_global, other)
+        self.assertEqual(fallback["tokens_delta"], 300)
+        self.assertEqual(fallback["token_delta_scope"], "global-approximate")
 
 
 if __name__ == "__main__":
