@@ -71,6 +71,23 @@ def _read_thread(
         conn.close()
 
 
+def _global_token_total(home: Path) -> int | None:
+    db = _state_db_path(home)
+    if db is None:
+        return None
+    try:
+        conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        row = conn.execute("SELECT COALESCE(SUM(tokens_used), 0) FROM threads").fetchone()
+        return int(row[0]) if row else 0
+    except sqlite3.Error:
+        return None
+    finally:
+        try:
+            conn.close()
+        except (UnboundLocalError, sqlite3.Error):
+            pass
+
+
 def _latest_rate_limits(home: Path) -> dict[str, Any] | None:
     sessions = home / "sessions"
     if not sessions.exists():
@@ -139,6 +156,7 @@ def usage_snapshot(
         "available": bool(row or limits),
         "thread_id": actual_thread,
         "tokens_total": int(row.get("tokens_used", 0)) if row else None,
+        "tokens_global_total": _global_token_total(home),
         "model": row.get("model") if row else None,
         "cwd": row.get("cwd") if row else repo_root,
         "source_db": row.get("db") if row else None,
@@ -161,8 +179,16 @@ def usage_delta(baseline: dict[str, Any] | None, current: dict[str, Any] | None)
         and baseline.get("thread_id") == current.get("thread_id")
     )
     token_delta = None
+    token_scope = None
     if same_thread and isinstance(before, int) and isinstance(after, int):
         token_delta = max(0, after - before)
+        token_scope = "thread"
+    else:
+        global_before = baseline.get("tokens_global_total")
+        global_after = current.get("tokens_global_total")
+        if isinstance(global_before, int) and isinstance(global_after, int):
+            token_delta = max(0, global_after - global_before)
+            token_scope = "global-approximate"
 
     def pct_delta(window: str) -> float | None:
         b = ((baseline.get("rate_limits") or {}).get(window) or {}).get("used_percent")
@@ -174,6 +200,7 @@ def usage_delta(baseline: dict[str, Any] | None, current: dict[str, Any] | None)
     return {
         "same_thread": same_thread,
         "tokens_delta": token_delta,
+        "token_delta_scope": token_scope,
         "primary_used_percent_delta": pct_delta("primary"),
         "secondary_used_percent_delta": pct_delta("secondary"),
     }
