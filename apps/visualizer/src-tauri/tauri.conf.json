@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Usage Guard Visualizer",
+  "version": "1.0.0-alpha.1",
+  "identifier": "com.codexusageguard.visualizer",
+  "build": {
+    "frontendDist": "../web"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Usage Guard",
+        "width": 720,
+        "height": 460,
+        "minWidth": 620,
+        "minHeight": 390,
+        "resizable": true,
+        "alwaysOnTop": true,
+        "decorations": true,
+        "center": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "category": "DeveloperTool",
+    "shortDescription": "Live visual companion for Codex Usage Guard"
+  }
+}
