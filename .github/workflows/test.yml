@@ -66,5 +66,11 @@ jobs:
         shell: pwsh
         run: |
           Get-Content apps/visualizer/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json | Out-Null
-      - name: Check Tauri visual companion
-        run: cargo check --manifest-path apps/visualizer/src-tauri/Cargo.toml
+      - name: Build Tauri visual companion
+        run: cargo build --release --manifest-path apps/visualizer/src-tauri/Cargo.toml
+      - name: Upload Windows visualizer alpha
+        uses: actions/upload-artifact@v4
+        with:
+          name: usage-guard-visualizer-windows-x64
+          path: apps/visualizer/src-tauri/target/release/usage-guard-visualizer.exe
+          if-no-files-found: error
