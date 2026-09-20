@@ -17,7 +17,7 @@ def main() -> int:
     failures: list[str] = []
 
     for item in fixtures:
-        plan = classify_task(item["task"], repo_path="/definitely/not/a/repo")
+        plan = classify_task(item["task"], repo_path="/definitely/not/a/repo", route_models=True)
         if "min_complexity" in item and plan.complexity < item["min_complexity"]:
             failures.append(f"{item['name']}: complexity {plan.complexity} below {item['min_complexity']}")
         if "max_complexity" in item and plan.complexity > item["max_complexity"]:
