@@ -4,11 +4,20 @@
 
 It does not replace Codex and it does not run another LLM. It adds deterministic local policy around Codex so model strength, reasoning effort, context, retries, verification, and subagents are used only when justified.
 
-> **v0.3 developer preview**. The project reports estimated context reduction, not guaranteed Codex allowance savings.
+> **v0.4 developer preview**. Usage Guard can measure local Codex token deltas and coarse account-meter deltas, but it does not claim guaranteed allowance savings.
 
-## What v0.3 does
+## What v0.4 does
 
-- adds a global **`cguard` pre-session launcher** that classifies locally before Codex starts
+- makes **`$usage-guard` inside Codex the normal workflow** after one-time installation
+- adds `$usage-guard status` / `$usage-guard usage` behavior with local before/current/after telemetry
+- reads Codex's local state database and rollout token-count events read-only; it never reads or forwards auth tokens
+- records total, input, cached-input, output, and reasoning-token deltas when the same Codex thread can be matched
+- records 5-hour and weekly used-percentage deltas when Codex exposes rate-limit snapshots
+- adds a small indexed next-action space inspired by fast browser-agent loops: only valid operations are offered
+- loads UI/UX, system-design, and browser-verification guidance only when the task needs it
+- optionally uses an already-installed Browser Harness for rendered UI verification
+- keeps Browser Use Cloud optional; core Usage Guard still needs no extra API key
+- retains the global **`cguard` launcher** for users who want the parent Codex model selected before the session starts
 - launches Codex with an explicit project root, selected model, and reasoning effort before the first model turn
 - classifies the task before broad repository exploration
 - inspects the real repository, changed files, diff size, manifests, scripts, and sensitive paths
@@ -74,50 +83,43 @@ For users who prefer not to pipe a remote script into PowerShell, clone the repo
 
 ## Use
 
-### Recommended: pre-session launcher
+### Recommended: stay inside Codex
 
-From any project folder:
+After the one-time install, open Codex normally in your project and use:
+
+    $usage-guard build a small CRM and verify it
+
+Usage Guard detects the repository, creates the local budget/state, captures a usage baseline, selects the route, loads only relevant craft references, and controls the verification loop.
+
+At any time inside Codex:
+
+    $usage-guard status
+    $usage-guard usage
+
+The status view includes the selected route, remaining action/model/retry budget, detected verification commands, relevant craft references, and before/current usage deltas.
+
+When the task finishes, Usage Guard reports the measured token delta when available. If the task started in a new pre-session launcher and no same-thread baseline exists, it can fall back to an approximate global token delta; concurrent Codex sessions can make that fallback noisy.
+
+### Optional: pre-session parent-model routing
+
+If you specifically want the Codex **parent session itself** to start on the selected model, use:
 
     cguard "fix the seller form and verify it"
 
-Usage Guard classifies the task locally first, creates the guarded state, then launches Codex with an explicit project root, model, and reasoning effort. This avoids starting every task on whatever model the parent Codex session happened to use.
+This remains useful because a Skill running inside an already-open Codex session cannot reliably replace the parent TUI model by itself. Codex's native `/model` command can change model/reasoning manually; `cguard` applies the route before the first turn.
 
-You can also choose a project explicitly:
+### Browser verification
 
-    cguard "C:\path\to\project" "fix the seller form"
+Usage Guard does not require browser automation. For UI tasks it will detect an existing `browser-harness` installation and can use it as deterministic rendered verification.
 
-If you run only:
-
-    cguard
-
-the launcher asks for the task locally before starting Codex.
-
-Preview the route without consuming a Codex turn or creating task state:
-
-    & "$HOME\.codex-usage-guard\guard.cmd" launch --dry-run --repo . "change the footer phone number"
-
-### Secondary: Skill inside an existing Codex session
-
-    $usage-guard fix the seller form and verify the build
-
-The Skill remains useful for an already-open session. It applies budgets, context policy, next-action control, and verification rules, but the already-running parent model may remain unchanged. Use `cguard` when automatic model selection matters.
-
-Codex CLI/IDE users can use `/skills` to inspect available Skills.
-
-### Compatibility wrapper
-
-Some Codex CLI builds/frontends have supported user prompt wrappers such as:
-
-    /prompts:harness fix the seller form
-
-This is a compatibility convenience, not the primary integration.
+Browser Use Cloud is optional. Usage Guard only considers it when the user has opted in and `BROWSER_USE_API_KEY` is already configured. No Browser Use key is required for the core guard.
 
 ## How a guarded task works
 
-    cguard + user objective
+    $usage-guard + user objective
          |
          v
-    local repo inspection
+    local repo inspection + local usage baseline
          |
          +--> changed files / diff size
          +--> sensitive paths
@@ -133,7 +135,11 @@ This is a compatibility convenience, not the primary integration.
          +--> action/model/retry limits
          |
          v
-    codex --cd <repo> --model <route> -c model_reasoning_effort=<effort>
+    route + progressive craft references
+         |
+         +--> UI/UX only when relevant
+         +--> system design only when relevant
+         +--> browser verification only when relevant
          |
          v
     persistent task state
@@ -146,17 +152,17 @@ This is a compatibility convenience, not the primary integration.
     Codex worker
          |
          v
-    local next-action predictor
+    indexed local action space
          |
          +--> inspect
-         +--> edit
          +--> targeted tests
          +--> typecheck
          +--> build
          +--> lint
+         +--> browser verify (when available/relevant)
          +--> diff review
-         +--> production verification
-         +--> stop
+         +--> production verify
+         +--> DONE / BLOCKED
          |
          +----> repeat only while budget/evidence justify it
 
@@ -167,6 +173,14 @@ The Skill runs these automatically, but they are also useful for debugging the h
 Preview a launch route without a model call:
 
     & "$HOME\.codex-usage-guard\guard.cmd" launch --dry-run --repo . "change the footer phone number"
+
+Read current Codex usage telemetry without a model call:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" usage --repo .
+
+Show the active task's route, budget, verification and usage delta:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" status --repo .
 
 Inspect a repository without a model call:
 
@@ -273,6 +287,27 @@ Compression is deterministic and local.
 - exact failure diagnostics are preferred over prose summaries
 
 The compressor is not a secret scrubber. If an underlying command prints credentials, fix that leak at the source.
+
+## Usage measurement
+
+Usage Guard reads only local Codex telemetry:
+
+- the newest compatible `~/.codex/state_N.sqlite` for thread token totals
+- local rollout `token_count` events for input/cached-input/output/reasoning breakdowns and rate-limit snapshots
+
+It never reads `~/.codex/auth.json` and never forwards Codex credentials.
+
+A same-thread token delta is the strongest measurement. A global-token fallback is marked approximate because another concurrent Codex session can contribute to it. The 5-hour/weekly percentage meters are coarse account counters and should not be presented as exact task cost.
+
+## Task-specific craft references
+
+The core Skill uses progressive disclosure: a task gets at most two extra craft references.
+
+- `ui-ux.md`: visual hierarchy, states, accessibility, responsive behavior, anti-generic UI checks
+- `system-design.md`: boundaries, data ownership, retries, migrations, security and tradeoffs
+- `browser-verification.md`: real-browser evidence, small valid browser actions, independent DONE checks
+
+See [THIRD_PARTY_RESEARCH.md](THIRD_PARTY_RESEARCH.md) for the public projects that informed these patterns and their licenses.
 
 ## Offline benchmark
 
