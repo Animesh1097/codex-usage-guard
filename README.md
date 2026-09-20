@@ -4,10 +4,12 @@
 
 It does not replace Codex and it does not run another LLM. It adds deterministic local policy around Codex so model strength, reasoning effort, context, retries, verification, and subagents are used only when justified.
 
-> **v0.2 developer preview**. The project reports estimated context reduction, not guaranteed Codex allowance savings.
+> **v0.3 developer preview**. The project reports estimated context reduction, not guaranteed Codex allowance savings.
 
-## What v0.2 does
+## What v0.3 does
 
+- adds a global **`cguard` pre-session launcher** that classifies locally before Codex starts
+- launches Codex with an explicit project root, selected model, and reasoning effort before the first model turn
 - classifies the task before broad repository exploration
 - inspects the real repository, changed files, diff size, manifests, scripts, and sensitive paths
 - selects a bounded Codex agent profile and reasoning level
@@ -34,7 +36,7 @@ No `OPENAI_API_KEY`, Ollama, DeepSeek/Anthropic key, paid proxy, or vector datab
 
 ## Model routing
 
-The default profiles follow current Codex subagent guidance:
+The default launcher routes are:
 
 | Workload | Profile | Model | Reasoning |
 |---|---|---|---|
@@ -46,7 +48,7 @@ The default profiles follow current Codex subagent guidance:
 
 Astra is deliberately not selected automatically. The goal is usage conservation, not maximum reasoning on every task.
 
-If a configured profile/model is unavailable, the Skill tells Codex to keep the same budget and continue with the current available model rather than failing the task.
+The recommended `cguard` path applies the selected model at Codex launch time. Direct `$usage-guard` Skill invocation inside an already-running Codex session can still recommend a route, but it cannot reliably replace the parent session model.
 
 ## Install on Windows
 
@@ -62,19 +64,43 @@ The installer:
 4. installs the global Skill to `~/.agents/skills/usage-guard`
 5. installs the custom Codex agents under `$CODEX_HOME/agents`
 6. creates `guard.cmd`
-7. runs `guard doctor`
+7. installs a global `cguard.cmd` launcher under `~/.codex-usage-guard-bin`
+8. adds that dedicated launcher directory to the user PATH
+9. runs `guard doctor`
 
-Restart Codex after installation.
+A new terminal may be needed before `cguard` is visible everywhere.
 
 For users who prefer not to pipe a remote script into PowerShell, clone the repository first, inspect `install.ps1`, and run it locally.
 
 ## Use
 
-### Recommended: explicit Skill invocation
+### Recommended: pre-session launcher
+
+From any project folder:
+
+    cguard "fix the seller form and verify it"
+
+Usage Guard classifies the task locally first, creates the guarded state, then launches Codex with an explicit project root, model, and reasoning effort. This avoids starting every task on whatever model the parent Codex session happened to use.
+
+You can also choose a project explicitly:
+
+    cguard "C:\path\to\project" "fix the seller form"
+
+If you run only:
+
+    cguard
+
+the launcher asks for the task locally before starting Codex.
+
+Preview the route without consuming a Codex turn or creating task state:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" launch --dry-run --repo . "change the footer phone number"
+
+### Secondary: Skill inside an existing Codex session
 
     $usage-guard fix the seller form and verify the build
 
-Codex can also activate the Skill implicitly when the task matches its description.
+The Skill remains useful for an already-open session. It applies budgets, context policy, next-action control, and verification rules, but the already-running parent model may remain unchanged. Use `cguard` when automatic model selection matters.
 
 Codex CLI/IDE users can use `/skills` to inspect available Skills.
 
@@ -84,11 +110,11 @@ Some Codex CLI builds/frontends have supported user prompt wrappers such as:
 
     /prompts:harness fix the seller form
 
-This is a compatibility convenience, not the core integration. The supported design is the Codex Skill.
+This is a compatibility convenience, not the primary integration.
 
 ## How a guarded task works
 
-    user objective
+    cguard + user objective
          |
          v
     local repo inspection
@@ -105,6 +131,9 @@ This is a compatibility convenience, not the core integration. The supported des
          +--> reasoning effort
          +--> context budget
          +--> action/model/retry limits
+         |
+         v
+    codex --cd <repo> --model <route> -c model_reasoning_effort=<effort>
          |
          v
     persistent task state
@@ -134,6 +163,10 @@ This is a compatibility convenience, not the core integration. The supported des
 ## Local control-plane commands
 
 The Skill runs these automatically, but they are also useful for debugging the harness.
+
+Preview a launch route without a model call:
+
+    & "$HOME\.codex-usage-guard\guard.cmd" launch --dry-run --repo . "change the footer phone number"
 
 Inspect a repository without a model call:
 
