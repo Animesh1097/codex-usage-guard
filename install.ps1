@@ -7,6 +7,8 @@ $CodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".c
 $AgentTarget = Join-Path $CodexHome "agents"
 $PromptTarget = Join-Path $CodexHome "prompts"
 $Launcher = Join-Path $InstallRoot "guard.cmd"
+$BinRoot = Join-Path $HOME ".codex-usage-guard-bin"
+$CguardLauncher = Join-Path $BinRoot "cguard.cmd"
 
 function Require-Command([string]$Name) {
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
@@ -57,6 +59,30 @@ if ($Python -eq "py") {
 }
 Set-Content -Path $Launcher -Value $LauncherBody -Encoding Ascii -NoNewline
 
+# Install a global cguard launcher. It classifies the task locally first, then
+# starts Codex with an explicit project root, model, and reasoning effort.
+New-Item -ItemType Directory -Force -Path $BinRoot | Out-Null
+$CguardBody = "@echo off`r`ncall `"$Launcher`" launch %*`r`n"
+Set-Content -Path $CguardLauncher -Value $CguardBody -Encoding Ascii -NoNewline
+
+function Has-PathEntry([string]$PathValue, [string]$Entry) {
+    if ([string]::IsNullOrWhiteSpace($PathValue)) { return $false }
+    $needle = $Entry.TrimEnd('\')
+    foreach ($part in ($PathValue -split ';')) {
+        if ($part.Trim().TrimEnd('\') -ieq $needle) { return $true }
+    }
+    return $false
+}
+
+$UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if (-not (Has-PathEntry $UserPath $BinRoot)) {
+    $NewUserPath = if ([string]::IsNullOrWhiteSpace($UserPath)) { $BinRoot } else { "$UserPath;$BinRoot" }
+    [Environment]::SetEnvironmentVariable("Path", $NewUserPath, "User")
+}
+if (-not (Has-PathEntry $env:Path $BinRoot)) {
+    $env:Path = "$env:Path;$BinRoot"
+}
+
 Write-Host "Running local doctor..." -ForegroundColor Cyan
 & $Launcher doctor
 if ($LASTEXITCODE -ne 0) { throw "Usage Guard doctor failed." }
@@ -64,6 +90,9 @@ if ($LASTEXITCODE -ne 0) { throw "Usage Guard doctor failed." }
 $Version = (& $Launcher version).Trim()
 Write-Host ""
 Write-Host "Codex Usage Guard $Version installed." -ForegroundColor Green
-Write-Host "Restart Codex, then invoke: `$usage-guard <task>"
-Write-Host "Codex can also activate the skill implicitly when the task matches its description."
+Write-Host "Recommended: run cguard from any project folder."
+Write-Host "  cguard `"fix the seller form`""
+Write-Host "Or choose a project explicitly:"
+Write-Host "  cguard `"C:\path\to\project`" `"fix the seller form`""
+Write-Host "The existing `$usage-guard <task> Skill remains available inside Codex."
 Write-Host "No API key or Ollama is required. It uses your existing Codex sign-in."
