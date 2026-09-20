@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usage Guard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell" data-phase="analyze" data-kind="general">
+    <section class="topbar" aria-label="Task progress">
+      <div class="brand">
+        <span class="pulse-dot" aria-hidden="true"></span>
+        <span>USAGE GUARD</span>
+      </div>
+      <div class="phase-rail" aria-hidden="true">
+        <i data-step="analyze"></i><b></b><i data-step="plan"></i><b></b><i data-step="work"></i><b></b><i data-step="verify"></i>
+      </div>
+      <div class="status-light" aria-label="Task active"></div>
+    </section>
+
+    <section class="factory" aria-label="Live task workflow">
+      <div class="ambient ambient-a"></div>
+      <div class="ambient ambient-b"></div>
+      <div class="track"></div>
+      <div class="station scanner" data-station="analyze"><span class="beam"></span><span class="screen"></span></div>
+      <div class="station blueprint" data-station="plan"><span class="node n1"></span><span class="node n2"></span><span class="node n3"></span><span class="link l1"></span><span class="link l2"></span></div>
+      <div class="station workshop" data-station="work"><span class="gear g1"></span><span class="gear g2"></span><span class="meter"></span></div>
+      <div class="station gate" data-station="verify"><span class="scan-line"></span></div>
+
+      <div class="worker worker-a"><span></span></div>
+      <div class="worker worker-b"><span></span></div>
+      <div class="worker worker-c"><span></span></div>
+
+      <div class="task-core" aria-hidden="true"><span></span></div>
+      <div class="success-mark" aria-hidden="true">✓</div>
+      <div class="failure-mark" aria-hidden="true">×</div>
+      <div class="confetti" aria-hidden="true"></div>
+    </section>
+
+    <section class="metrics" aria-label="Guard metrics">
+      <div class="metric">
+        <span>Actions</span>
+        <div class="bar"><i id="actionsBar"></i></div>
+        <strong id="actionsValue">0 / 0</strong>
+      </div>
+      <div class="metric">
+        <span>Turns</span>
+        <div class="bar"><i id="turnsBar"></i></div>
+        <strong id="turnsValue">0 / 0</strong>
+      </div>
+      <div class="metric tokens">
+        <span>Task tokens</span>
+        <strong id="tokensValue">—</strong>
+      </div>
+    </section>
+
+    <p class="sr-only" id="liveStatus" aria-live="polite">Analyzing task</p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
