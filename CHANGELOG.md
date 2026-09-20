@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.0
+
+- replace the terminal-first live-task experience with an optional graphical pixel-art factory visualizer
+- automatically open one small always-on-top visualizer window when a guarded task is enforced and a desktop GUI is available
+- animate a glowing task cube, workers, conveyors, routing gate, execution machinery, verification scanner, and completion/failure scene
+- derive animation stages from real guard state instead of inventing a fake percentage
+- keep the scene alive while the task is working; parent-thread actions can move the visual state between inspect/work/verify and pinned workers stay animated during execution
+- close the visual automatically a few seconds after the task reaches completed/failed state
+- encode selected model family with visual machine accents rather than a scrolling text log
+- keep the compact terminal HUD as a fallback for headless/unsupported environments
+- allow users to disable the graphical visualizer with `CODEX_USAGE_GUARD_DISABLE_VISUAL=1`
+- preserve v0.7 UI quality checks and v0.5+ verified model routing
+
+
 ## 0.7.0
 
 - substantially strengthen the UI/UX quality policy for product and brand surfaces

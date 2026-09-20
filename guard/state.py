@@ -52,6 +52,11 @@ def start_task(task: str, plan: dict[str, Any], repo: RepoProfile, *, root: Path
             "delta": None,
         },
         "execution": None,
+        "visual": {
+            "phase": "analyze",
+            "activity": "inspect",
+            "launched": False,
+        },
     }
     path = _task_path(task_id, root)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -95,6 +100,38 @@ def save_task(state: dict[str, Any], *, root: Path = TASKS_ROOT) -> None:
     path.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
+def update_visual_state(
+    task_id: str,
+    *,
+    phase: str | None = None,
+    activity: str | None = None,
+    launched: bool | None = None,
+    root: Path = TASKS_ROOT,
+) -> dict[str, Any]:
+    state = load_task(task_id, root=root)
+    visual = state.setdefault("visual", {})
+    if phase is not None:
+        visual["phase"] = phase
+    if activity is not None:
+        visual["activity"] = activity
+    if launched is not None:
+        visual["launched"] = launched
+    visual["updated_at"] = _now()
+    save_task(state, root=root)
+    return visual
+
+
+def _visual_phase_for_action(action: str, kind: str) -> tuple[str, str]:
+    text = action.lower()
+    if any(word in text for word in ("test", "build", "lint", "typecheck", "browser", "verify", "diff", "review")):
+        return "verify", "verification"
+    if any(word in text for word in ("inspect", "trace", "reproduce", "search", "read")) and kind != "model":
+        return "analyze", "inspection"
+    if any(word in text for word in ("route", "model", "worker")) and "pinned execution worker" not in text:
+        return "route", "routing"
+    return "execute", "work"
+
+
 def record_action(
     task_id: str,
     *,
@@ -132,6 +169,12 @@ def record_action(
     elif outcome == "fail" and action not in state["unresolved"]:
         state["unresolved"].append(action)
 
+    phase, activity = _visual_phase_for_action(action, kind)
+    visual = state.setdefault("visual", {})
+    visual["phase"] = "failed" if outcome == "fail" and kind == "model" else phase
+    visual["activity"] = activity
+    visual["updated_at"] = _now()
+
     save_task(state, root=root)
     return {"recorded": True, "budget": budget_status(state), "event": event}
 
@@ -139,6 +182,10 @@ def record_action(
 def finish_task(task_id: str, *, status: str = "completed", root: Path = TASKS_ROOT) -> dict[str, Any]:
     state = load_task(task_id, root=root)
     state["status"] = status
+    visual = state.setdefault("visual", {})
+    visual["phase"] = "complete" if status == "completed" else "failed"
+    visual["activity"] = status
+    visual["updated_at"] = _now()
     baseline = (state.get("usage") or {}).get("baseline", {})
     baseline_thread = baseline.get("thread_id")
     if baseline_thread == "__usage_guard_pending_thread__":

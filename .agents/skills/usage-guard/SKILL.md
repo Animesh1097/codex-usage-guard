@@ -28,9 +28,11 @@ Otherwise on Windows:
 
 Keep the returned `task_id`. The plan includes model/reasoning policy, budgets, verification commands, local usage baseline, and zero-to-two task-specific reference files.
 
-Immediately enforce the route. This command shows the compact animated Guard HUD when the terminal supports live redraw:
+Immediately enforce the route:
 
     & "$HOME\.codex-usage-guard\guard.cmd" enforce --task-id <ID>
+
+On a supported desktop this automatically launches the small pixel-art factory visualizer and keeps it alive while guarded work continues. Do not print a prose progress log merely to explain what the animation is showing. When a graphical window cannot be opened, the compact terminal HUD remains the fallback.
 
 After enforcement, read the machine result without replacing the user-facing HUD:
 
@@ -43,7 +45,7 @@ Interpret the enforcement/status result strictly:
 - `failed`, `model-mismatch`, `reasoning-mismatch`, `unverified`, or `unverified-no-thread`: do not silently continue model-heavy implementation on the coordinator. Report the routing failure with the requested and observed route. Deterministic inspection is allowed.
 - `budget-blocked`: do not bypass the guard.
 
-The coordinator status line may still show its original model when a pinned worker was used. That is expected. The Guard HUD is the default human-facing progress view; `status --json` is the machine-readable source of truth for requested model, coordinator model, verified execution model, and route status.
+The coordinator status line may still show its original model when a pinned worker was used. That is expected. The pixel factory is the default live human-facing progress view when available; the terminal HUD is its fallback. `status --json` remains the machine-readable source of truth for requested model, coordinator model, verified execution model, and route status.
 
 Never claim the selected model was used unless enforcement is `parent-match` or `verified`.
 
