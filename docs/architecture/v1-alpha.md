@@ -14,6 +14,17 @@ The split is deliberate:
 
 This follows the strongest pattern from the research: compiled developer tools reduce installation/runtime friction, while Tauri provides a modern web-rendered UI without requiring an Electron-sized bundled browser.
 
+### Why Rust + Tauri
+
+Rust is not being chosen because it is fashionable. It matches this project's boundary:
+
+- Tauri already has a Rust backend, so the core and desktop bridge can share types and validation.
+- the core is mostly deterministic state/policy/process logic, where a compiled single-binary implementation is a good fit.
+- memory/process/thread safety matters once state writes, telemetry readers, and visual events run concurrently.
+- a Rust library can be tested independently from the web UI.
+
+Go + Wails remains a credible alternative, especially for simpler contributor ergonomics, but choosing it now would mean replacing both the core language and the selected desktop shell. TypeScript/Electron would maximize UI familiarity but would increase runtime/bundle overhead. Python remains the safest migration source because the current behavior is already implemented and tested there.
+
 ## Target repository layout
 
 ```text
