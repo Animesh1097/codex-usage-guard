@@ -135,13 +135,21 @@ For UI-relevant work, Usage Guard first inspects the incumbent design system:
 
     guard.cmd ui-context --repo .
 
+Before editing it now also derives a visual-quality bar:
+
+    guard.cmd ui-brief --task "<objective>" --repo .
+
+High-ambition prompts such as polished, premium, eye-catching, distinctive, memorable, high-end, or explicitly non-generic UI enter **design-grade mode**. That mode requires an explicit visual concept before coding and two rendered critique passes.
+
 After editing it runs:
 
     guard.cmd ui-audit --repo . --strict --json
 
-When browser tooling is available, the changed flow should be rendered and checked at representative narrow mobile, compact/tablet, and desktop widths. The final UI acceptance pass covers hierarchy, typography, spacing, alignment, states, clipping/overflow, responsiveness, focus behavior, and anti-generic design quality.
+The deterministic audit checks source-code/accessibility hygiene and common generated-UI anti-patterns. It does **not** certify aesthetic quality.
 
-A passing build alone is not sufficient UI evidence.
+When browser tooling is available, the changed flow should be rendered and checked at representative narrow mobile, compact/tablet, and desktop widths. Functional browser verification and aesthetic critique are treated as separate evidence. The final UI acceptance pass covers composition, hierarchy, typography, spacing, alignment, color/material coherence, states, clipping/overflow, responsiveness, focus behavior, and product-specific identity.
+
+A passing build or source audit alone is not sufficient UI evidence.
 
 ## How a guarded task works
 
