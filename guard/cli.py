@@ -73,6 +73,7 @@ def cmd_start(args: argparse.Namespace) -> int:
             "plan": state["plan"],
             "repo": state["repo"],
             "budget": budget_status(state),
+            "usage_before": (state.get("usage") or {}).get("baseline"),
         }
     )
     return 0
