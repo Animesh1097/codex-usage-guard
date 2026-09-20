@@ -41,7 +41,7 @@ def _read_thread(
         if not {"id", "tokens_used"}.issubset(columns):
             return None
 
-        optional = [name for name in ("model", "cwd", "updated_at") if name in columns]
+        optional = [name for name in ("model", "reasoning_effort", "cwd", "updated_at") if name in columns]
         select = ", ".join(["id", "tokens_used", *optional])
 
         if thread_id:
@@ -177,6 +177,7 @@ def usage_snapshot(
         "tokens_global_total": _global_token_total(home),
         "token_breakdown": breakdown,
         "model": row.get("model") if row else None,
+        "reasoning_effort": row.get("reasoning_effort") if row else None,
         "cwd": row.get("cwd") if row else repo_root,
         "source_db": row.get("db") if row else None,
         "rate_limits": {
