@@ -50,8 +50,9 @@ def _read_thread(
                 (thread_id,),
             ).fetchone()
         elif repo_root and "cwd" in columns:
+            order = "updated_at DESC" if "updated_at" in columns else "rowid DESC"
             row = conn.execute(
-                f"SELECT {select} FROM threads WHERE cwd = ? ORDER BY updated_at DESC LIMIT 1",
+                f"SELECT {select} FROM threads WHERE cwd = ? ORDER BY {order} LIMIT 1",
                 (repo_root,),
             ).fetchone()
         else:
