@@ -23,7 +23,7 @@ from .state import finish_task, latest_active_task_id, load_task, record_action,
 from .telemetry import aggregate, record_compression, record_task_summary
 from .ui_quality import audit_ui, design_brief, inspect_ui_context
 from .usage import usage_delta, usage_snapshot
-from .visualizer import can_open_window, spawn_visualizer, visualizer_command
+from .visualizer import can_open_window, spawn_visualizer, visualizer_command, visualizer_enabled
 
 
 def _json(data: object) -> None:
@@ -72,9 +72,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     plan = classify_task(args.task, args.repo)
     state = start_task(args.task, plan.to_dict(), profile)
 
-    launched = False
-    if os.environ.get("CODEX_USAGE_GUARD_DISABLE_VISUAL") != "1":
-        launched = spawn_visualizer(str(state["task_id"]))
+    launched = spawn_visualizer(str(state["task_id"]))
     update_visual_state(
         str(state["task_id"]),
         phase="analyze",
@@ -442,6 +440,8 @@ def cmd_doctor(_: argparse.Namespace) -> int:
         "browser_use_cloud_configured": bool(os.environ.get("BROWSER_USE_API_KEY")),
         "visualizer_backend": visual_backend,
         "compiled_visualizer_available": visual_backend == "tauri",
+        "graphical_visualizer_enabled": visualizer_enabled(),
+        "graphical_visualizer_autostart": False,
         "ready": bool(python_ok and git_version and codex_version),
     }
     _json(checks)
