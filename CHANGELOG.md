@@ -11,6 +11,8 @@
 - make UI audit output explicitly report that rendered visual review is still required
 - add design-grade critique dimensions covering concept, composition, typography, rhythm, color, control craft, identity, responsiveness, restraint, and finish
 - add tests for high-ambition design-brief behavior and audit semantics
+- stop automatically opening the separate pixel-art/Tauri progress window during normal `$usage-guard` tasks
+- keep graphical visualization only as explicit opt-in via `CODEX_USAGE_GUARD_VISUAL=1`; normal progress stays inside Codex
 
 
 ## 1.0.0a1
