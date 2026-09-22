@@ -97,6 +97,12 @@ def _safe_tk() -> tuple[Any, Any] | tuple[None, None]:
         return None, None
 
 
+def visualizer_enabled() -> bool:
+    if os.environ.get("CODEX_USAGE_GUARD_DISABLE_VISUAL") == "1":
+        return False
+    return os.environ.get("CODEX_USAGE_GUARD_VISUAL") == "1"
+
+
 def desktop_available() -> bool:
     if os.name == "nt" or sys.platform == "darwin":
         return True
@@ -128,7 +134,7 @@ def visualizer_command(task_id: str, *, install_root: Path | None = None) -> lis
 
 
 def spawn_visualizer(task_id: str, *, install_root: Path | None = None) -> bool:
-    if os.environ.get("CODEX_USAGE_GUARD_DISABLE_VISUAL") == "1":
+    if not visualizer_enabled():
         return False
     if not desktop_available():
         return False
