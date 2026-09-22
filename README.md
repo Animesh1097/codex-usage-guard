@@ -16,7 +16,7 @@ It does not replace Codex and it does not run another LLM by default. The normal
 - prefers a compiled visualizer automatically when one is installed, with the existing Python/Tkinter view as fallback
 - does not automatically switch models, change reasoning effort, or spawn a pinned Codex worker
 - leaves `cguard` / legacy route enforcement available only as explicit advanced opt-in tools
-- launches the graphical task visualizer when a desktop GUI is available
+- keeps separate graphical pop-up visualization off by default
 - visualizes the real workflow as **analyze → plan → work → verify → complete/failed**
 - removes model names and model-routing signals from the normal visual UI
 - uses task-kind color accents instead of model-family colors
@@ -107,27 +107,29 @@ At any time:
 
 `$usage-guard status` shows the current task phase, budgets, usage, and verification state without model-routing noise.
 
-### Live task visualizer
+### Task progress
 
-For desktop sessions, starting a guarded task automatically opens a small always-on-top pixel-art task scene.
+Normal Usage Guard use stays inside Codex and does **not** automatically open a separate always-on-top window.
 
-The scene is driven by real task state:
+Use:
 
-- **analyze**: repository inspection / tracing
-- **plan**: scoping / design / implementation planning
-- **work**: editing and implementation
-- **verify**: tests, build, browser checks, diff review
-- **complete / failed**: terminal task state
+    $usage-guard status
 
-There is no fake percent-complete meter. The active task block stays at the real station until the guard state changes.
+for compact model-neutral progress based on the real task phases:
 
-The visual theme is based on task type rather than model choice, so normal use does not imply or advertise model switching.
+- **analyze**
+- **plan**
+- **work**
+- **verify**
+- **complete / failed**
 
-The visualizer is local and requires no additional API key or hosted UI service. The v1 alpha includes a Tauri visual companion scaffold; when a compiled companion is installed Usage Guard prefers it automatically. The current Python/Tkinter visualizer remains the fallback during migration. If no graphical window can open, Usage Guard falls back to a compact model-neutral terminal HUD.
+The experimental graphical companion remains in the repository for optional testing, but it is opt-in only and is never required by the core guard.
 
-Disable the graphical visualizer with:
+To explicitly enable it for a session:
 
-    CODEX_USAGE_GUARD_DISABLE_VISUAL=1
+    CODEX_USAGE_GUARD_VISUAL=1
+
+The older `CODEX_USAGE_GUARD_DISABLE_VISUAL=1` setting is still honored and overrides opt-in.
 
 ### UI/UX quality path
 
@@ -135,13 +137,21 @@ For UI-relevant work, Usage Guard first inspects the incumbent design system:
 
     guard.cmd ui-context --repo .
 
+Before editing it now also derives a visual-quality bar:
+
+    guard.cmd ui-brief --task "<objective>" --repo .
+
+High-ambition prompts such as polished, premium, eye-catching, distinctive, memorable, high-end, or explicitly non-generic UI enter **design-grade mode**. That mode requires an explicit visual concept before coding and two rendered critique passes.
+
 After editing it runs:
 
     guard.cmd ui-audit --repo . --strict --json
 
-When browser tooling is available, the changed flow should be rendered and checked at representative narrow mobile, compact/tablet, and desktop widths. The final UI acceptance pass covers hierarchy, typography, spacing, alignment, states, clipping/overflow, responsiveness, focus behavior, and anti-generic design quality.
+The deterministic audit checks source-code/accessibility hygiene and common generated-UI anti-patterns. It does **not** certify aesthetic quality.
 
-A passing build alone is not sufficient UI evidence.
+When browser tooling is available, the changed flow should be rendered and checked at representative narrow mobile, compact/tablet, and desktop widths. Functional browser verification and aesthetic critique are treated as separate evidence. The final UI acceptance pass covers composition, hierarchy, typography, spacing, alignment, color/material coherence, states, clipping/overflow, responsiveness, focus behavior, and product-specific identity.
+
+A passing build or source audit alone is not sufficient UI evidence.
 
 ## How a guarded task works
 

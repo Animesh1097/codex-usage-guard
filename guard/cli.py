@@ -21,9 +21,9 @@ from .next_action import predict_next_action
 from .repo import inspect_repo
 from .state import finish_task, latest_active_task_id, load_task, record_action, start_task, update_visual_state
 from .telemetry import aggregate, record_compression, record_task_summary
-from .ui_quality import audit_ui, inspect_ui_context
+from .ui_quality import audit_ui, design_brief, inspect_ui_context
 from .usage import usage_delta, usage_snapshot
-from .visualizer import can_open_window, spawn_visualizer, visualizer_command
+from .visualizer import can_open_window, spawn_visualizer, visualizer_command, visualizer_enabled
 
 
 def _json(data: object) -> None:
@@ -72,9 +72,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     plan = classify_task(args.task, args.repo)
     state = start_task(args.task, plan.to_dict(), profile)
 
-    launched = False
-    if os.environ.get("CODEX_USAGE_GUARD_DISABLE_VISUAL") != "1":
-        launched = spawn_visualizer(str(state["task_id"]))
+    launched = spawn_visualizer(str(state["task_id"]))
     update_visual_state(
         str(state["task_id"]),
         phase="analyze",
@@ -182,6 +180,11 @@ def cmd_usage(args: argparse.Namespace) -> int:
 
 def cmd_ui_context(args: argparse.Namespace) -> int:
     _json(inspect_ui_context(args.repo))
+    return 0
+
+
+def cmd_ui_brief(args: argparse.Namespace) -> int:
+    _json(design_brief(args.task, args.repo))
     return 0
 
 
@@ -437,6 +440,8 @@ def cmd_doctor(_: argparse.Namespace) -> int:
         "browser_use_cloud_configured": bool(os.environ.get("BROWSER_USE_API_KEY")),
         "visualizer_backend": visual_backend,
         "compiled_visualizer_available": visual_backend == "tauri",
+        "graphical_visualizer_enabled": visualizer_enabled(),
+        "graphical_visualizer_autostart": False,
         "ready": bool(python_ok and git_version and codex_version),
     }
     _json(checks)
@@ -497,6 +502,11 @@ def build_parser() -> argparse.ArgumentParser:
     ui_context = sub.add_parser("ui-context", help="inspect the repository's existing UI styling and component system")
     ui_context.add_argument("--repo", default=".")
     ui_context.set_defaults(func=cmd_ui_context)
+
+    ui_brief = sub.add_parser("ui-brief", help="derive the visual ambition and design-quality gate for a UI task")
+    ui_brief.add_argument("--task", required=True)
+    ui_brief.add_argument("--repo", default=".")
+    ui_brief.set_defaults(func=cmd_ui_brief)
 
     ui_audit = sub.add_parser("ui-audit", help="run a deterministic audit for common UI/accessibility quality regressions")
     ui_audit.add_argument("--repo", default=".")

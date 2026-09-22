@@ -10,6 +10,7 @@ from guard.visualizer import (
     task_kind_from_state,
     task_palette,
     visualizer_command,
+    visualizer_enabled,
 )
 
 
@@ -37,6 +38,22 @@ class VisualizerStateTests(unittest.TestCase):
         debugging = {"plan": {"task_kind": "debugging"}}
         self.assertEqual(task_kind_from_state(ui), "ui")
         self.assertNotEqual(task_palette("ui"), task_palette("debugging"))
+
+    def test_graphical_visualizer_is_disabled_by_default(self):
+        with patch.dict("guard.visualizer.os.environ", {}, clear=True):
+            self.assertFalse(visualizer_enabled())
+
+    def test_graphical_visualizer_requires_explicit_opt_in(self):
+        with patch.dict("guard.visualizer.os.environ", {"CODEX_USAGE_GUARD_VISUAL": "1"}, clear=True):
+            self.assertTrue(visualizer_enabled())
+
+    def test_legacy_disable_flag_overrides_opt_in(self):
+        with patch.dict(
+            "guard.visualizer.os.environ",
+            {"CODEX_USAGE_GUARD_VISUAL": "1", "CODEX_USAGE_GUARD_DISABLE_VISUAL": "1"},
+            clear=True,
+        ):
+            self.assertFalse(visualizer_enabled())
 
     def test_compiled_visualizer_is_preferred_when_present(self):
         with tempfile.TemporaryDirectory() as td:

@@ -62,3 +62,22 @@ For each relevant viewport, look for:
 - controls that become too small or ambiguous
 
 If screenshots are available, use them for geometry and visual judgement. Use DOM/accessibility state for semantics and interaction correctness. Neither one alone proves the full UI is correct.
+
+
+## Design-grade visual review
+
+When `ui-brief` reports `visual_ambition: design-grade`, browser verification has two independent responsibilities:
+
+1. **Functional evidence** — interaction, persistence, validation, focus, responsive mechanics.
+2. **Aesthetic evidence** — composition, hierarchy, typography, color/material coherence, density, identity, and finish.
+
+Do not collapse those into one "browser flow passed" statement.
+
+For the aesthetic pass, capture or inspect at least:
+- the primary desktop viewport;
+- the primary narrow-mobile viewport;
+- one state that exposes real product density (table/list/board/detail rather than only an empty screen).
+
+On the first rendered pass, identify the three largest visual weaknesses. Correct those before spending time on minor polish. Re-render and critique again.
+
+A deterministic source audit passing means **code hygiene passed**. It does not mean **visual quality passed**.

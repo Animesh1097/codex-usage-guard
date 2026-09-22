@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from guard.repo import RepoProfile
-from guard.ui_quality import audit_ui, inspect_ui_context
+from guard.ui_quality import audit_ui, design_brief, inspect_ui_context
 
 
 class UIQualityTests(unittest.TestCase):
@@ -39,6 +39,35 @@ class UIQualityTests(unittest.TestCase):
             self.assertIn("border-plus-heavy-shadow", rules)
             self.assertIn("eyebrow-reflex", rules)
             self.assertFalse(result["passes_strict_gate"])
+            self.assertTrue(result["source_quality_only"])
+            self.assertTrue(result["visual_review_required"])
+            self.assertIsNone(result["visual_quality_approved"])
+
+    def test_high_ambition_ui_task_requires_two_rendered_critiques(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            profile = self._profile(root, ())
+            with patch("guard.ui_quality.inspect_repo", return_value=profile):
+                brief = design_brief(
+                    "Build a polished eye-catching CRM dashboard that is not generic",
+                    root,
+                )
+
+            self.assertEqual(brief["visual_ambition"], "design-grade")
+            self.assertEqual(brief["rendered_critique_passes"], 2)
+            self.assertTrue(brief["anti_default_shell"])
+            self.assertTrue(brief["browser_visual_review_required"])
+
+    def test_standard_ui_task_uses_production_bar(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            profile = self._profile(root, ())
+            with patch("guard.ui_quality.inspect_repo", return_value=profile):
+                brief = design_brief("fix the form spacing on mobile", root)
+
+            self.assertEqual(brief["visual_ambition"], "production")
+            self.assertEqual(brief["rendered_critique_passes"], 1)
+            self.assertFalse(brief["anti_default_shell"])
 
     def test_context_detects_existing_design_system(self):
         with tempfile.TemporaryDirectory() as td:

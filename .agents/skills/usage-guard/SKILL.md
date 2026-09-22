@@ -34,7 +34,7 @@ The start command now:
 - creates action / turn / retry budgets
 - captures a local usage baseline
 - chooses zero-to-two task-specific craft references
-- launches the graphical task visualizer when a desktop GUI is available
+- keeps graphical pop-up visualization off by default; task state remains available through status/HUD
 
 Do **not** run `enforce` in the normal workflow.
 
@@ -59,7 +59,7 @@ Use real action names such as:
 - browser verify
 - review diff
 
-Those actions also drive the live visualizer through analyze → plan → work → verify.
+Those actions update the task phase through analyze → plan → work → verify. Normal use stays inside Codex without opening a separate window.
 
 Ask for the cheapest justified next operation:
 
@@ -73,42 +73,42 @@ If the model-turn budget is exhausted, continue only with deterministic checks t
 
 For UI-relevant tasks, load `references/ui-ux.md` and, when selected, `references/browser-verification.md`.
 
-Before editing:
+Before editing, inspect the incumbent UI system **and** derive the visual-quality bar:
 
     & "$HOME\.codex-usage-guard\guard.cmd" ui-context --repo .
+    & "$HOME\.codex-usage-guard\guard.cmd" ui-brief --task "<USER_OBJECTIVE>" --repo .
+
+If `ui-brief` returns `visual_ambition: design-grade`, do not begin implementation until the visual concept, composition rule, typography roles, color/material roles, density rhythm, and one signature product-specific detail are explicit.
 
 After editing:
 
     & "$HOME\.codex-usage-guard\guard.cmd" ui-audit --repo . --strict --json
 
+The deterministic audit is **source-code hygiene only**. It can detect implementation/accessibility anti-patterns, but it cannot certify that the rendered UI is beautiful, distinctive, or visually resolved.
+
 The expected UI loop is:
 
 1. inspect the incumbent design system
-2. shape hierarchy and primary action
-3. implement the smallest complete change
-4. run deterministic UI audit
-5. run detected project checks
-6. render the changed flow in a browser when available
-7. critique hierarchy, spacing, typography, states, responsiveness, clipping, and accessibility
-8. make one targeted polish pass
-9. review the final diff
+2. derive `ui-brief` and set the production vs design-grade bar
+3. shape visual concept, hierarchy, composition, typography, and primary action
+4. implement the smallest complete change
+5. run deterministic UI audit
+6. run detected project checks
+7. render the changed flow in a browser when available
+8. critique composition, hierarchy, typography, spacing, color/material coherence, controls/states, responsiveness, product identity, clipping, and accessibility
+9. fix the largest visual defects first
+10. for design-grade work, re-render and perform a **second aesthetic critique pass**
+11. review the final diff
 
-A passing build is not enough proof for UI work.
+A passing build or passing `ui-audit` is not enough proof for UI work. If rendered browser/screenshot evidence is unavailable, explicitly report that aesthetic quality was not visually verified.
 
-## Live visualizer
+## Task progress
 
-The graphical visualizer is a progress metaphor, not a fake percentage meter.
+Normal Usage Guard use does **not** open a separate graphical window.
 
-Its phases correspond to actual task state:
-- analyze
-- plan
-- work
-- verify
-- complete / failed
+Use `$usage-guard status` for compact model-neutral task progress. The same analyze → plan → work → verify → complete/failed state is maintained internally.
 
-It does not display or imply model switching.
-
-If graphical rendering is unavailable, Usage Guard falls back to the compact model-neutral terminal HUD.
+The legacy/experimental graphical companion remains available only by explicit opt-in with `CODEX_USAGE_GUARD_VISUAL=1`. It must never be required for core execution.
 
 ## Compression
 

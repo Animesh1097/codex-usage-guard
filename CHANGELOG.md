@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0a2
+
+- add `ui-brief` to derive a production vs design-grade visual quality bar before UI implementation
+- detect high-ambition UI requests such as polished, premium, eye-catching, distinctive, memorable, high-end, and explicitly non-generic work
+- require a compact visual concept, composition rule, typography roles, color/material roles, density rhythm, and signature product-specific detail before design-grade coding
+- require two rendered aesthetic critique passes for design-grade UI tasks
+- separate functional browser verification from aesthetic visual verification
+- clarify that `ui-audit` is source-code/accessibility hygiene only and cannot approve aesthetic quality
+- make UI audit output explicitly report that rendered visual review is still required
+- add design-grade critique dimensions covering concept, composition, typography, rhythm, color, control craft, identity, responsiveness, restraint, and finish
+- add tests for high-ambition design-brief behavior and audit semantics
+- stop automatically opening the separate pixel-art/Tauri progress window during normal `$usage-guard` tasks
+- keep graphical visualization only as explicit opt-in via `CODEX_USAGE_GUARD_VISUAL=1`; normal progress stays inside Codex
+
+
 ## 1.0.0a1
 
 - begin incremental migration from the Python prototype to a compiled Rust deterministic core
