@@ -34,7 +34,7 @@ The start command now:
 - creates action / turn / retry budgets
 - captures a local usage baseline
 - chooses zero-to-two task-specific craft references
-- launches the graphical task visualizer when a desktop GUI is available
+- keeps graphical pop-up visualization off by default; task state remains available through status/HUD
 
 Do **not** run `enforce` in the normal workflow.
 
@@ -59,7 +59,7 @@ Use real action names such as:
 - browser verify
 - review diff
 
-Those actions also drive the live visualizer through analyze → plan → work → verify.
+Those actions update the task phase through analyze → plan → work → verify. Normal use stays inside Codex without opening a separate window.
 
 Ask for the cheapest justified next operation:
 
@@ -102,20 +102,13 @@ The expected UI loop is:
 
 A passing build or passing `ui-audit` is not enough proof for UI work. If rendered browser/screenshot evidence is unavailable, explicitly report that aesthetic quality was not visually verified.
 
-## Live visualizer
+## Task progress
 
-The graphical visualizer is a progress metaphor, not a fake percentage meter.
+Normal Usage Guard use does **not** open a separate graphical window.
 
-Its phases correspond to actual task state:
-- analyze
-- plan
-- work
-- verify
-- complete / failed
+Use `$usage-guard status` for compact model-neutral task progress. The same analyze → plan → work → verify → complete/failed state is maintained internally.
 
-It does not display or imply model switching.
-
-If graphical rendering is unavailable, Usage Guard falls back to the compact model-neutral terminal HUD.
+The legacy/experimental graphical companion remains available only by explicit opt-in with `CODEX_USAGE_GUARD_VISUAL=1`. It must never be required for core execution.
 
 ## Compression
 
