@@ -16,7 +16,7 @@ It does not replace Codex and it does not run another LLM by default. The normal
 - prefers a compiled visualizer automatically when one is installed, with the existing Python/Tkinter view as fallback
 - does not automatically switch models, change reasoning effort, or spawn a pinned Codex worker
 - leaves `cguard` / legacy route enforcement available only as explicit advanced opt-in tools
-- launches the graphical task visualizer when a desktop GUI is available
+- keeps separate graphical pop-up visualization off by default
 - visualizes the real workflow as **analyze → plan → work → verify → complete/failed**
 - removes model names and model-routing signals from the normal visual UI
 - uses task-kind color accents instead of model-family colors
@@ -107,27 +107,29 @@ At any time:
 
 `$usage-guard status` shows the current task phase, budgets, usage, and verification state without model-routing noise.
 
-### Live task visualizer
+### Task progress
 
-For desktop sessions, starting a guarded task automatically opens a small always-on-top pixel-art task scene.
+Normal Usage Guard use stays inside Codex and does **not** automatically open a separate always-on-top window.
 
-The scene is driven by real task state:
+Use:
 
-- **analyze**: repository inspection / tracing
-- **plan**: scoping / design / implementation planning
-- **work**: editing and implementation
-- **verify**: tests, build, browser checks, diff review
-- **complete / failed**: terminal task state
+    $usage-guard status
 
-There is no fake percent-complete meter. The active task block stays at the real station until the guard state changes.
+for compact model-neutral progress based on the real task phases:
 
-The visual theme is based on task type rather than model choice, so normal use does not imply or advertise model switching.
+- **analyze**
+- **plan**
+- **work**
+- **verify**
+- **complete / failed**
 
-The visualizer is local and requires no additional API key or hosted UI service. The v1 alpha includes a Tauri visual companion scaffold; when a compiled companion is installed Usage Guard prefers it automatically. The current Python/Tkinter visualizer remains the fallback during migration. If no graphical window can open, Usage Guard falls back to a compact model-neutral terminal HUD.
+The experimental graphical companion remains in the repository for optional testing, but it is opt-in only and is never required by the core guard.
 
-Disable the graphical visualizer with:
+To explicitly enable it for a session:
 
-    CODEX_USAGE_GUARD_DISABLE_VISUAL=1
+    CODEX_USAGE_GUARD_VISUAL=1
+
+The older `CODEX_USAGE_GUARD_DISABLE_VISUAL=1` setting is still honored and overrides opt-in.
 
 ### UI/UX quality path
 
